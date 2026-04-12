@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adaptive PDF Compressor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #f5f4f0;
+      --surface:    #ffffff;
+      --surface2:   #f0efe9;
+      --border:     #d8d6cc;
+      --border2:    #c4c2b6;
+      --text:       #1a1916;
+      --text2:      #6b6960;
+      --text3:      #9e9d97;
+      --accent:     #1a1916;
+      --green-bg:   #eaf3de;
+      --green-txt:  #3b6d11;
+      --blue-bg:    #e6f1fb;
+      --blue-txt:   #185fa5;
+      --amber-bg:   #faeeda;
+      --amber-txt:  #854f0b;
+      --purple-bg:  #eeedfe;
+      --purple-txt: #534ab7;
+      --red-bg:     #fcebeb;
+      --red-txt:    #a32d2d;
+      --radius-sm:  6px;
+      --radius-md:  10px;
+      --radius-lg:  14px;
+    }
+
+    [data-theme="dark"] {
+      --bg:         #141412;
+      --surface:    #1e1d1a;
+      --surface2:   #252420;
+      --border:     #333230;
+      --border2:    #444240;
+      --text:       #f0ede8;
+      --text2:      #9a9890;
+      --text3:      #5e5d57;
+      --green-bg:   #173404;
+      --green-txt:  #c0dd97;
+      --blue-bg:    #042c53;
+      --blue-txt:   #b5d4f4;
+      --amber-bg:   #412402;
+      --amber-txt:  #fac775;
+      --purple-bg:  #26215c;
+      --purple-txt: #cecbf6;
+      --red-bg:     #501313;
+      --red-txt:    #f7c1c1;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      grid-template-rows: 56px 1fr;
+      min-height: 100vh;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo-box {
+      width: 32px; height: 32px;
+      border: 1.5px solid var(--text);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo-box svg { width: 16px; height: 16px; stroke: var(--text); }
+    .topbar-title { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; flex: 1; }
+    .gs-badge {
+      font-size: 10px; font-family: 'JetBrains Mono', monospace;
+      padding: 3px 9px; border-radius: 99px; font-weight: 700;
+      letter-spacing: 0.5px; display: none;
+    }
+    .gs-ok  { background: var(--green-bg); color: var(--green-txt); display: inline; }
+    .gs-off { background: var(--amber-bg); color: var(--amber-txt); display: inline; }
+    .status-dot {
+      font-size: 11px; color: var(--text2);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .theme-btn {
+      background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 5px 10px; cursor: pointer; font-size: 13px; color: var(--text2);
+      font-family: 'JetBrains Mono', monospace; letter-spacing: 0.3px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .theme-btn:hover { border-color: var(--text); color: var(--text); }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── MAIN ── */
+    .main {
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── SECTION LABEL ── */
+    .label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: var(--text2);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 8px;
+    }
+
+    /* ── DROP ZONE ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius-lg);
+      padding: 28px 16px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--text);
+      background: var(--surface2);
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-icon { font-size: 26px; margin-bottom: 10px; display: block; }
+    .drop-label { font-size: 14px; font-weight: 600; }
+    .drop-hint { font-size: 11px; color: var(--text2); margin-top: 5px; font-family: 'JetBrains Mono', monospace; }
+
+    /* ── FILE BADGE ── */
+    .file-badge {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 9px 12px;
+    }
+    .file-badge.visible { display: flex; }
+    .file-icon { font-size: 18px; flex-shrink: 0; }
+    .file-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-size { font-size: 11px; color: var(--text2); font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+    .remove-btn { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 16px; padding: 0 2px; line-height: 1; }
+    .remove-btn:hover { color: var(--text); }
+
+    /* ── MODE BUTTONS ── */
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .mode-btn {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 8px;
+      background: var(--surface);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.12s;
+      font-family: 'Syne', sans-serif;
+      color: var(--text);
+    }
+    .mode-btn:hover { background: var(--surface2); border-color: var(--border2); }
+    .mode-btn.active { border: 1.5px solid var(--text); background: var(--surface2); }
+    .mode-icon { font-size: 18px; display: block; margin-bottom: 4px; }
+    .mode-name { font-size: 12px; font-weight: 700; display: block; letter-spacing: 0.4px; }
+    .mode-desc { font-size: 10px; color: var(--text2); display: block; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+    /* ── PARAM CARD ── */
+    .param-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      background: var(--surface2);
+      transition: opacity 0.2s;
+    }
+    .param-card.dimmed { opacity: 0.38; pointer-events: none; }
+    .param-label {
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .param-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text); }
+    .param-card input[type="range"] {
+      width: 100%;
+      accent-color: var(--text);
+      margin-top: 2px;
+      cursor: pointer;
+    }
+    .param-card select {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 10px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+    }
+    .param-card select:focus { border-color: var(--text); }
+    .param-hint { font-size: 10px; color: var(--text3); font-family: 'JetBrains Mono', monospace; margin-top: 6px; }
+
+    /* ── TOGGLE ── */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
+    .toggle-row + .toggle-row { border-top: 1px solid var(--border); }
+    .toggle-label { font-size: 13px; font-weight: 500; }
+    .toggle { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .slider-track {
+      position: absolute; inset: 0;
+      background: var(--border2);
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .slider-track { background: var(--text); }
+    .slider-track::after {
+      content: '';
+      position: absolute;
+      left: 3px; top: 3px;
+      width: 16px; height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: left 0.2s;
+    }
+    .toggle input:checked + .slider-track::after { left: 19px; }
+
+    /* ── ADVANCED ── */
+    .adv-toggle {
+      font-size: 11px; color: var(--text2); cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; border: none; background: none;
+      padding: 0; display: flex; align-items: center; gap: 6px;
+      letter-spacing: 0.5px; width: 100%;
+    }
+    .adv-toggle:hover { color: var(--text); }
+    .adv-panel { display: none; margin-top: 12px; }
+    .adv-panel.open { display: block; }
+    .th-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .th-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      background: var(--surface2);
+    }
+    .th-label { font-size: 10px; color: var(--text2); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: block; letter-spacing: 0.3px; }
+    .th-card input[type="number"] {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+      outline: none;
+    }
+    .th-card input:focus { border-color: var(--text); }
+
+    /* ── CMD BOX ── */
+    .cmd-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .cmd-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cmd-header-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; color: var(--text2); font-weight: 700; }
+    .cmd-copy-btn {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 3px 10px; cursor: pointer;
+      color: var(--text2); letter-spacing: 0.5px; transition: color 0.15s, border-color 0.15s;
+    }
+    .cmd-copy-btn:hover { color: var(--text); border-color: var(--border2); }
+    .cmd-body {
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text2);
+      word-break: break-all;
+      line-height: 1.7;
+    }
+    .cmd-kw  { color: var(--text); font-weight: 700; }
+    .cmd-flag { color: var(--text3); }
+    .cmd-val  { color: var(--text); }
+
+    /* ── RUN BTN ── */
+    .run-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--radius-md);
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: opacity 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .run-btn:hover:not(:disabled) { opacity: 0.82; }
+    .run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── PROGRESS ── */
+    .progress-wrap { display: none; }
+    .progress-wrap.visible { display: block; }
+    .progress-label { font-size: 11px; color: var(--text2); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .progress-msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .progress-pct { flex-shrink: 0; font-weight: 700; color: var(--text); }
+    .progress-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--text);
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.18s ease;
+    }
+    /* pass steps */
+    .pass-steps {
+      display: none;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pass-steps.visible { display: flex; }
+    .pass-step {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; font-family: 'JetBrains Mono', monospace;
+      color: var(--text3);
+      transition: color 0.15s;
+    }
+    .pass-step.active  { color: var(--blue-txt); }
+    .pass-step.done    { color: var(--green-txt); }
+    .pass-step.skipped { color: var(--text3); text-decoration: line-through; }
+    .pass-step.error   { color: var(--red-txt); }
+    .step-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+      background: var(--border2);
+      transition: background 0.15s;
+    }
+    .pass-step.active  .step-dot { background: var(--blue-txt); }
+    .pass-step.done    .step-dot { background: var(--green-txt); }
+    .pass-step.error   .step-dot { background: var(--red-txt); }
+    .step-detail { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── RESULTS PANEL ── */
+    .results {
+      display: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .results.visible { display: block; }
+    .results-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface2);
+    }
+    .results-title { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--text2); }
+    .status-pill {
+      font-size: 10px; font-family: 'JetBrains Mono', monospace;
+      padding: 3px 10px; border-radius: 99px; font-weight: 700; letter-spacing: 0.5px;
+    }
+    .pill-ok  { background: var(--green-bg); color: var(--green-txt); }
+    .pill-err { background: var(--red-bg); color: var(--red-txt); }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-bottom: 1px solid var(--border);
+    }
+    .metric {
+      padding: 16px 14px;
+      border-right: 1px solid var(--border);
+    }
+    .metric:last-child { border-right: none; }
+    .metric-lbl { font-size: 10px; color: var(--text2); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; display: block; letter-spacing: 0.5px; }
+    .metric-val { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .metric-val.green { color: var(--green-txt); }
+
+    .feat-table { width: 100%; border-collapse: collapse; }
+    .feat-table td { padding: 9px 16px; font-size: 12px; border-bottom: 1px solid var(--border); }
+    .feat-table tr:last-child td { border-bottom: none; }
+    .feat-table .fk { color: var(--text2); font-family: 'JetBrains Mono', monospace; width: 50%; }
+    .feat-table .fv { font-weight: 600; font-family: 'JetBrains Mono', monospace; text-align: right; }
+
+    .class-badge {
+      display: inline-flex; align-items: center;
+      font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 700;
+      padding: 3px 10px; border-radius: var(--radius-sm); letter-spacing: 0.5px;
+    }
+    .cls-SCAN    { background: var(--amber-bg); color: var(--amber-txt); }
+    .cls-DIGITAL { background: var(--blue-bg);  color: var(--blue-txt); }
+    .cls-HYBRID  { background: var(--purple-bg); color: var(--purple-txt); }
+
+    /* ── DOWNLOAD BTN ── */
+    .download-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 12px 16px 16px;
+      padding: 11px 16px;
+      background: var(--green-bg);
+      color: var(--green-txt);
+      border: 1px solid currentColor;
+      border-radius: var(--radius-md);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      letter-spacing: 0.3px;
+      transition: opacity 0.15s;
+    }
+    .download-btn:hover { opacity: 0.8; }
+    .download-btn.hidden { display: none; }
+
+    /* ── LOG ── */
+    .log-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .log-header {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .log-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--text2); }
+    .log-clear { font-size: 10px; color: var(--text3); background: none; border: none; cursor: pointer; font-family: 'JetBrains Mono', monospace; }
+    .log-clear:hover { color: var(--text2); }
+    .log-body {
+      padding: 12px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text2);
+      min-height: 80px;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+    .log-line { margin-bottom: 2px; }
+    .log-info  { color: var(--blue-txt); }
+    .log-ok    { color: var(--green-txt); }
+    .log-warn  { color: var(--amber-txt); }
+    .log-err   { color: var(--red-txt); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; grid-template-rows: 56px auto 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+      .metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .th-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="logo-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="9" y1="13" x2="15" y2="13"/>
+        <line x1="9" y1="17" x2="15" y2="17"/>
+      </svg>
+    </div>
+    <div style="flex:1;">
+      <span class="topbar-title">Adaptive PDF Compressor</span>
+    </div>
+    <span id="gsBadge" class="gs-badge"></span>
+    <span class="status-dot" id="statusLabel">initializing…</span>
+    <button class="theme-btn" id="themeBtn">dark</button>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- FILE -->
+    <div>
+      <div class="label">Input File</div>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".pdf">
+        <span class="drop-icon">📄</span>
+        <div class="drop-label">Drop PDF atau klik</div>
+        <div class="drop-hint">.pdf saja · maks 100 MB</div>
+      </div>
+      <div class="file-badge" id="fileBadge">
+        <span class="file-icon">📄</span>
+        <span class="file-name" id="fileName">—</span>
+        <span class="file-size" id="fileSize">—</span>
+        <button class="remove-btn" id="removeBtn" title="Hapus">✕</button>
+      </div>
+    </div>
+
+    <!-- MODE -->
+    <div>
+      <div class="label">Mode</div>
+      <div class="mode-grid">
+        <button class="mode-btn active" data-mode="AUTO">
+          <span class="mode-icon">🤖</span>
+          <span class="mode-name">AUTO</span>
+          <span class="mode-desc">deteksi otomatis</span>
+        </button>
+        <button class="mode-btn" data-mode="DIGITAL">
+          <span class="mode-icon">📝</span>
+          <span class="mode-name">DIGITAL</span>
+          <span class="mode-desc">teks berat</span>
+        </button>
+        <button class="mode-btn" data-mode="SCAN">
+          <span class="mode-icon">📷</span>
+          <span class="mode-name">SCAN</span>
+          <span class="mode-desc">berbasis gambar</span>
+        </button>
+        <button class="mode-btn" data-mode="HYBRID">
+          <span class="mode-icon">⚡</span>
+          <span class="mode-name">HYBRID</span>
+          <span class="mode-desc">campuran</span>
+        </button>
+      </div>
+      <div style="margin-top:8px; font-size:11px; color:var(--text2);">
+        Klasifikasi terdeteksi: <span id="previewClass" style="display:none;"></span>
+      </div>
+    </div>
+
+    <!-- RUN -->
+    <button class="run-btn" id="runBtn" disabled>
+      <span id="runBtnText">Pilih file dulu</span>
+      <span style="font-size:16px;" id="runBtnArrow">→</span>
+    </button>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- PARAMS -->
+    <div>
+      <div class="label">Parameter Kompresi</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+
+        <!-- DPI — SCAN only -->
+        <div class="param-card" id="dpiCard">
+          <div class="param-label">
+            Target DPI <span class="param-value" id="dpiVal">150</span>
+          </div>
+          <input type="range" min="72" max="300" step="1" value="150" id="dpiSlider">
+          <div class="param-hint" id="dpiHint">72 (kecil) ← → 300 (tajam) · hanya SCAN</div>
+        </div>
+
+        <!-- JPEG Quality — semua mode -->
+        <div class="param-card" id="jpegCard">
+          <div class="param-label">
+            Kualitas JPEG <span class="param-value" id="jpegVal">75</span>
+          </div>
+          <input type="range" min="20" max="95" step="1" value="75" id="jpegSlider">
+          <div class="param-hint" id="jpegHint">20 (terkecil) ← → 95 (terbaik) · gambar embedded</div>
+        </div>
+
+        <!-- GS PDF Setting — DIGITAL/HYBRID -->
+        <div class="param-card" id="pdfCard">
+          <div class="param-label">GS PDF Setting</div>
+          <select id="pdfSetting">
+            <option value="/screen">/screen — 72dpi, terkecil</option>
+            <option value="/ebook" selected>/ebook — 150dpi, seimbang</option>
+            <option value="/printer">/printer — 300dpi, kualitas tinggi</option>
+            <option value="/prepress">/prepress — kualitas maksimal</option>
+          </select>
+          <div class="param-hint">DIGITAL / HYBRID · butuh Ghostscript</div>
+        </div>
+
+        <!-- GC Level — DIGITAL/HYBRID -->
+        <div class="param-card" id="gcCard">
+          <div class="param-label">
+            Garbage Collection <span class="param-value" id="garbageVal">4</span>
+          </div>
+          <input type="range" min="0" max="4" step="1" value="4" id="garbageSlider">
+          <div class="param-hint">0 (mati) ← → 4 (maksimal) · DIGITAL / HYBRID</div>
+        </div>
+
+        <!-- Toggle options — full width -->
+        <div class="param-card" style="grid-column:1/-1;">
+          <div class="toggle-row">
+            <span class="toggle-label">Grayscale output <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;">(Semua Mode)</span></span>
+            <label class="toggle"><input type="checkbox" id="grayscale"><span class="slider-track"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Deflate recompression <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;">(DIGITAL/HYBRID)</span></span>
+            <label class="toggle"><input type="checkbox" id="deflate" checked><span class="slider-track"></span></label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">Clean xref / PDF structure <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;">(DIGITAL/HYBRID)</span></span>
+            <label class="toggle"><input type="checkbox" id="clean" checked><span class="slider-track"></span></label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ADVANCED thresholds -->
+      <div style="margin-top:12px;">
+        <button class="adv-toggle" id="advToggle">▼ &nbsp;advanced — threshold klasifikasi</button>
+        <div class="adv-panel" id="advPanel">
+          <div class="th-grid" style="margin-top:10px;">
+            <div class="th-card">
+              <span class="th-label">SCAN text threshold</span>
+              <input type="number" id="scanTh" value="20" min="0">
+            </div>
+            <div class="th-card">
+              <span class="th-label">DIGITAL text threshold</span>
+              <input type="number" id="digitalTh" value="200" min="0">
+            </div>
+            <div class="th-card">
+              <span class="th-label">min gambar/halaman (SCAN)</span>
+              <input type="number" id="minImg" value="1.0" step="0.1" min="0">
+            </div>
+            <div class="th-card">
+              <span class="th-label">max ukuran GS (MB)</span>
+              <input type="number" id="maxSizeGs" value="50.0" step="1" min="0">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMMAND PREVIEW -->
+    <div>
+      <div class="cmd-wrap">
+        <div class="cmd-header">
+          <span class="cmd-header-label">CLI Equivalent</span>
+          <button class="cmd-copy-btn" id="copyBtn">copy</button>
+        </div>
+        <div class="cmd-body" id="cmdBody">
+          <span class="cmd-kw">python</span>
+          <span class="cmd-kw"> pdf.py</span>
+          <span class="cmd-val"> input.pdf output_compressed.pdf</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span class="progress-msg" id="progressMsg">Initializing…</span>
+        <span class="progress-pct" id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="pass-steps visible" id="passSteps">
+        <div class="pass-step" id="step-init">
+          <span class="step-dot"></span><span class="step-detail">Analisis fitur PDF</span>
+        </div>
+        <div class="pass-step" id="step-passA">
+          <span class="step-dot"></span><span class="step-detail" id="stepA-detail">Pass A</span>
+        </div>
+        <div class="pass-step" id="step-passB">
+          <span class="step-dot"></span><span class="step-detail" id="stepB-detail">Pass B</span>
+        </div>
+        <div class="pass-step" id="step-passC">
+          <span class="step-dot"></span><span class="step-detail" id="stepC-detail">Pass C</span>
+        </div>
+        <div class="pass-step" id="step-passD">
+          <span class="step-dot"></span><span class="step-detail" id="stepD-detail">Pass D</span>
+        </div>
+        <div class="pass-step" id="step-select">
+          <span class="step-dot"></span><span class="step-detail">Pilih hasil terbaik</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="results" id="results">
+      <div class="results-header">
+        <span class="results-title">Hasil</span>
+        <span class="status-pill pill-ok" id="statusPill">SUCCESS</span>
+      </div>
+      <div class="metrics-row">
+        <div class="metric">
+          <span class="metric-lbl">SEBELUM</span>
+          <span class="metric-val" id="mBefore">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-lbl">SESUDAH</span>
+          <span class="metric-val" id="mAfter">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-lbl">HEMAT</span>
+          <span class="metric-val green" id="mSaved">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-lbl">WAKTU</span>
+          <span class="metric-val" id="mTime">—</span>
+        </div>
+      </div>
+      <table class="feat-table">
+        <tr><td class="fk">kelas terdeteksi</td><td class="fv" id="rClass">—</td></tr>
+        <tr><td class="fk">mode digunakan</td><td class="fv" id="rMode">—</td></tr>
+        <tr><td class="fk">halaman</td><td class="fv" id="rPages">—</td></tr>
+        <tr><td class="fk">rasio kompresi</td><td class="fv" id="rRatio">—</td></tr>
+        <tr><td class="fk">avg panjang teks / halaman</td><td class="fv" id="rText">—</td></tr>
+        <tr><td class="fk">avg gambar / halaman</td><td class="fv" id="rImg">—</td></tr>
+        <tr><td class="fk">throughput</td><td class="fv" id="rThroughput">—</td></tr>
+        <tr><td class="fk">ghostscript digunakan</td><td class="fv" id="rGs">—</td></tr>
+      </table>
+      <a id="downloadBtn" class="download-btn hidden" href="#" download>
+        ⬇ &nbsp;Download compressed.pdf
+      </a>
+    </div>
+
+    <!-- LOG -->
+    <div class="log-wrap">
+      <div class="log-header">
+        <span class="log-label">Log</span>
+        <button class="log-clear" id="logClear">clear</button>
+      </div>
+      <div class="log-body" id="logBody">
+        <div class="log-line log-info">— PDF Compressor siap —</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  /* ================================================================
+     STATE
+  ================================================================ */
+  const S = {
+    mode: 'AUTO',
+    file: null,
+    dpi: 150, jpegQ: 75, garbage: 4,
+    pdfSetting: '/ebook',
+    grayscale: false, deflate: true, clean: true,
+    scanTh: 20, digitalTh: 200, minImg: 1.0,
+    maxSizeGs: 50.0,
+    gsOnly: false,
+    advOpen: false,
+    running: false,
+    gsAvailable: false,
+    features: null,  // fitur PDF untuk preview klasifikasi
+  };
+
+  /* ================================================================
+     HELPERS
+  ================================================================ */
+  function fmt(b) {
+    if (b < 1024)    return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+  }
+
+  function ts() {
+    return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function log(msg, cls = '') {
+    const el = document.createElement('div');
+    el.className = 'log-line' + (cls ? ' log-' + cls : '');
+    el.textContent = `[${ts()}] ${msg}`;
+    const body = document.getElementById('logBody');
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function setStatus(txt) {
+    document.getElementById('statusLabel').textContent = txt;
+  }
+
+  // Fungsi klasifikasi lokal berdasarkan fitur dan threshold
+  function classifyLocal(feats, scanTh, digitalTh, minImg) {
+    const avgText = feats.avg_text_len_per_page;
+    const avgImgs = feats.avg_images_per_page;
+    if (avgText < scanTh && avgImgs >= minImg) return 'SCAN';
+    if (avgText >= digitalTh && avgImgs < 1.0) return 'DIGITAL';
+    return 'HYBRID';
+  }
+
+  function updatePreviewClassification() {
+    if (!S.features) return;
+    const cls = classifyLocal(S.features, S.scanTh, S.digitalTh, S.minImg);
+    const el = document.getElementById('previewClass');
+    el.innerHTML = `<span class="class-badge cls-${cls}">${cls}</span>`;
+    el.style.display = 'block';
+  }
+
+  /* ================================================================
+     GHOSTSCRIPT STATUS — fetch dari /status saat load
+  ================================================================ */
+  async function fetchStatus() {
+    try {
+      const res = await fetch('/status');
+      const data = await res.json();
+      S.gsAvailable = data.gs_available;
+
+      const badge = document.getElementById('gsBadge');
+      if (data.gs_available) {
+        badge.textContent = 'GS ✓';
+        badge.className = 'gs-badge gs-ok';
+        log(`Ghostscript tersedia: ${data.gs_executable}`, 'ok');
+      } else {
+        badge.textContent = 'GS ✗';
+        badge.className = 'gs-badge gs-off';
+        log('Ghostscript tidak ditemukan — mode DIGITAL/HYBRID hanya structural optimization.', 'warn');
+      }
+      setStatus('ready');
+    } catch {
+      setStatus('offline');
+      log('Tidak dapat terhubung ke server Flask.', 'err');
+    }
+  }
+
+  /* ================================================================
+     CLI COMMAND BUILDER
+  ================================================================ */
+  function buildCmd() {
+    const inp = S.file ? S.file.name : 'input.pdf';
+    const out  = inp.replace(/\.pdf$/i, '') + '_compressed.pdf';
+    const parts = [
+      { t: 'kw',  v: 'python' },
+      { t: 'kw',  v: ' pdf.py' },
+      { t: 'val', v: ` "${inp}"` },
+      { t: 'val', v: ` "${out}"` },
+    ];
+
+    if (S.mode !== 'AUTO') {
+      parts.push({ t: 'flag', v: ' --mode' }, { t: 'val', v: ` ${S.mode}` });
+    }
+
+    const isScan    = S.mode === 'SCAN';
+    const isAuto    = S.mode === 'AUTO';
+    const isDigHyb  = S.mode === 'DIGITAL' || S.mode === 'HYBRID';
+
+    if (isScan || isAuto) {
+      if (S.dpi   !== 150) parts.push({ t: 'flag', v: ' --dpi' },    { t: 'val', v: ` ${S.dpi}` });
+      if (S.jpegQ !== 75)  parts.push({ t: 'flag', v: ' --jpeg-q' }, { t: 'val', v: ` ${S.jpegQ}` });
+      if (S.grayscale)     parts.push({ t: 'flag', v: ' --grayscale' });
+    }
+
+    if (!isScan || isAuto) {
+      if (S.pdfSetting !== '/ebook') parts.push({ t: 'flag', v: ' --pdf-setting' }, { t: 'val', v: ` ${S.pdfSetting}` });
+      if (S.garbage !== 4)           parts.push({ t: 'flag', v: ' --garbage' },     { t: 'val', v: ` ${S.garbage}` });
+      if (!S.deflate)                parts.push({ t: 'flag', v: ' --no-deflate' });
+      if (!S.clean)                  parts.push({ t: 'flag', v: ' --no-clean' });
+    }
+
+    if (S.scanTh   !== 20)  parts.push({ t: 'flag', v: ' --scan-text-th' },   { t: 'val', v: ` ${S.scanTh}` });
+    if (S.digitalTh !== 200) parts.push({ t: 'flag', v: ' --digital-text-th' }, { t: 'val', v: ` ${S.digitalTh}` });
+    if (S.minImg   !== 1.0)  parts.push({ t: 'flag', v: ' --min-img-scan' },   { t: 'val', v: ` ${S.minImg}` });
+
+    return parts;
+  }
+
+  function refreshCmd() {
+    const parts = buildCmd();
+    const html = parts.map(p => {
+      if (p.t === 'kw')   return `<span class="cmd-kw">${p.v}</span>`;
+      if (p.t === 'flag') return `<span class="cmd-flag">${p.v}</span>`;
+      return `<span class="cmd-val">${p.v}</span>`;
+    }).join('');
+    document.getElementById('cmdBody').innerHTML = html;
+  }
+
+  function getPlainCmd() {
+    return buildCmd().map(p => p.v).join('').trim();
+  }
+
+  /* ================================================================
+     PARAM CARD VISIBILITY — sesuai mode
+  ================================================================ */
+  function updateParamCards() {
+    const isScan   = S.mode === 'SCAN';
+    const isDigHyb = S.mode === 'DIGITAL' || S.mode === 'HYBRID';
+    const isAuto   = S.mode === 'AUTO';
+
+    // DPI only relevant for SCAN
+    document.getElementById('dpiCard').classList.toggle('dimmed', isDigHyb);
+
+    // JPEG quality: active for ALL modes
+    // SCAN = rasterisation quality, DIGITAL/HYBRID/AUTO = Pass A+D image recompression
+    document.getElementById('jpegCard').classList.remove('dimmed');
+    const jpegHint = document.getElementById('jpegHint');
+    if (jpegHint) {
+      jpegHint.textContent = isScan
+        ? '20 (terkecil) ← → 95 (terbaik) · kualitas rasterisasi'
+        : '20 (terkecil) ← → 95 (terbaik) · rekompresi gambar embedded (Pass A & D)';
+    }
+
+    // GS setting and GC only for DIGITAL/HYBRID/AUTO
+    document.getElementById('pdfCard').classList.toggle('dimmed', isScan);
+    document.getElementById('gcCard').classList.toggle('dimmed',  isScan);
+  }
+
+  /* ================================================================
+     FILE HANDLING
+  ================================================================ */
+  const dropZone  = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const fileBadge = document.getElementById('fileBadge');
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) setFile(e.target.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.name.toLowerCase().endsWith('.pdf')) {
+      setFile(f);
+    } else {
+      log('File harus berformat .pdf', 'err');
+    }
+  });
+
+  function setFile(f) {
+    if (f.size > 100 * 1024 * 1024) {
+      log(`File terlalu besar: ${fmt(f.size)}. Maks 100 MB.`, 'err');
+      return;
+    }
+    S.file = f;
+    document.getElementById('fileName').textContent = f.name;
+    document.getElementById('fileSize').textContent = fmt(f.size);
+    fileBadge.classList.add('visible');
+    dropZone.style.display = 'none';
+    log(`File dimuat: ${f.name} (${fmt(f.size)})`, 'info');
+
+    // Preview klasifikasi
+    const fd = new FormData();
+    fd.append('pdf', f);
+    fetch('/preview', { method: 'POST', body: fd })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        S.features = data;
+        updatePreviewClassification();
+        log(`Fitur diekstrak: ${data.pages} halaman, ${data.total_text_len} teks, ${data.total_images} gambar`, 'info');
+      })
+      .catch(err => {
+        log('Gagal ekstrak fitur: ' + err.message, 'err');
+      });
+
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtnText').textContent = 'Jalankan Kompresi';
+    refreshCmd();
+  }
+
+  document.getElementById('removeBtn').addEventListener('click', () => {
+    S.file = null;
+    S.features = null;
+    document.getElementById('previewClass').style.display = 'none';
+    fileInput.value = '';
+    fileBadge.classList.remove('visible');
+    dropZone.style.display = '';
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('runBtnText').textContent = 'Pilih file dulu';
+    log('File dihapus.', 'warn');
+    refreshCmd();
+  });
+
+  /* ================================================================
+     MODE BUTTONS
+  ================================================================ */
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      S.mode = btn.dataset.mode;
+      updateParamCards();
+      refreshCmd();
+      log(`Mode → ${S.mode}`, 'info');
+    });
+  });
+
+  /* ================================================================
+     SLIDERS
+  ================================================================ */
+  document.getElementById('dpiSlider').addEventListener('input', e => {
+    S.dpi = +e.target.value;
+    document.getElementById('dpiVal').textContent = S.dpi;
+    refreshCmd();
+  });
+  document.getElementById('jpegSlider').addEventListener('input', e => {
+    S.jpegQ = +e.target.value;
+    document.getElementById('jpegVal').textContent = S.jpegQ;
+    refreshCmd();
+  });
+  document.getElementById('garbageSlider').addEventListener('input', e => {
+    S.garbage = +e.target.value;
+    document.getElementById('garbageVal').textContent = S.garbage;
+    refreshCmd();
+  });
+
+  /* ================================================================
+     SELECTS & TOGGLES
+  ================================================================ */
+  document.getElementById('pdfSetting').addEventListener('change', e => { S.pdfSetting = e.target.value; refreshCmd(); });
+  document.getElementById('grayscale').addEventListener('change', e => { S.grayscale = e.target.checked; refreshCmd(); });
+  document.getElementById('deflate').addEventListener('change',   e => { S.deflate   = e.target.checked; refreshCmd(); });
+  document.getElementById('clean').addEventListener('change',     e => { S.clean     = e.target.checked; refreshCmd(); });
+
+  /* ================================================================
+     ADVANCED THRESHOLDS
+  ================================================================ */
+  document.getElementById('scanTh').addEventListener('input',    e => { S.scanTh    = +e.target.value; refreshCmd(); updatePreviewClassification(); });
+  document.getElementById('digitalTh').addEventListener('input', e => { S.digitalTh = +e.target.value; refreshCmd(); updatePreviewClassification(); });
+  document.getElementById('minImg').addEventListener('input',    e => { S.minImg    = +e.target.value; refreshCmd(); updatePreviewClassification(); });
+  document.getElementById('maxSizeGs').addEventListener('input', e => { S.maxSizeGs = +e.target.value; refreshCmd(); });
+
+  document.getElementById('advToggle').addEventListener('click', () => {
+    S.advOpen = !S.advOpen;
+    document.getElementById('advPanel').classList.toggle('open', S.advOpen);
+    document.getElementById('advToggle').textContent =
+      (S.advOpen ? '▲' : '▼') + ' \u00a0advanced — threshold klasifikasi';
+  });
+
+  /* ================================================================
+     COPY CLI COMMAND
+  ================================================================ */
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(getPlainCmd()).then(() => {
+      document.getElementById('copyBtn').textContent = 'copied!';
+      log('Command CLI disalin.', 'ok');
+      setTimeout(() => document.getElementById('copyBtn').textContent = 'copy', 1800);
+    }).catch(() => log('Gagal menyalin. Izinkan akses clipboard.', 'err'));
+  });
+
+  /* ================================================================
+     LOG CLEAR
+  ================================================================ */
+  document.getElementById('logClear').addEventListener('click', () => {
+    document.getElementById('logBody').innerHTML = '';
+  });
+
+  /* ================================================================
+     PROGRESS — real steps driven by SSE events
+  ================================================================ */
+  const STEP_MAP = {
+    "init":         { row: "step-init",   range: [0,  6]  },
+    "rasterize":    { row: "step-passA",  range: [6,  50] },
+    "pikepdf":      { row: "step-passA",  range: [6,  35] },
+    "struct":       { row: "step-passB",  range: [35, 55] },
+    "ghostscript":  { row: "step-passC",  range: [55, 80] },
+    // Pass D reuses pikepdf step name but maps to passD row
+    "pass_start":   { row: null,          range: null      },
+    "pass_done":    { row: null,          range: null      },
+    "pass_skip":    { row: "step-passC",  range: null      },
+    "pass_err":     { row: null,          range: null      },
+    "fallback":     { row: "step-select", range: null      },
+    "select_best":  { row: "step-select", range: [95, 100] },
+  };
+
+  // Track which pass we're in to route pikepdf events to correct row
+  let _currentPass = null;
+  let _activeRow = null;
+
+  function resetSteps(mode) {
+    ["step-init","step-passA","step-passB","step-passC","step-passD","step-select"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className = "pass-step";
+    });
+    const isScan = (mode === 'SCAN');
+    document.getElementById('stepA-detail').textContent =
+      isScan ? 'Pass A — Rasterisasi halaman' : 'Pass A — Rekompresi gambar (pikepdf)';
+    document.getElementById('stepB-detail').textContent = 'Pass B — Optimasi struktur PDF';
+    document.getElementById('stepC-detail').textContent = 'Pass C — Ghostscript font-subset';
+    document.getElementById('stepD-detail').textContent = 'Pass D — Rekompresi gambar post-GS';
+    _currentPass = null;
+    _activeRow = null;
+  }
+
+  function setStepState(rowId, state, detail) {
+    if (!rowId) return;
+    const el = document.getElementById(rowId);
+    if (!el) return;
+    el.className = `pass-step ${state}`;
+    const detailEl = el.querySelector('.step-detail');
+    if (detailEl && detail) detailEl.textContent = detail;
+  }
+
+  function onProgressEvent(data) {
+    const { step, pct, detail } = data;
+
+    // Track current pass from pass_start events
+    if (step === 'pass_start') {
+      if (detail.includes('Pass A')) _currentPass = 'A';
+      else if (detail.includes('Pass B')) _currentPass = 'B';
+      else if (detail.includes('Pass C')) _currentPass = 'C';
+      else if (detail.includes('Pass D')) _currentPass = 'D';
+      const rowMap = { A: 'step-passA', B: 'step-passB', C: 'step-passC', D: 'step-passD' };
+      const row = rowMap[_currentPass];
+      if (row) setStepState(row, 'active', detail);
+      setProgress(null, detail);
+      return;
+    }
+
+    if (step === 'pass_done') {
+      const rowMap = { A: 'step-passA', B: 'step-passB', C: 'step-passC', D: 'step-passD' };
+      const row = rowMap[_currentPass];
+      if (row) setStepState(row, 'done', detail);
+      setProgress(null, detail);
+      return;
+    }
+
+    if (step === 'pass_skip') {
+      const rowMap = { A: 'step-passA', B: 'step-passB', C: 'step-passC', D: 'step-passD' };
+      const row = rowMap[_currentPass] || 'step-passC';
+      setStepState(row, 'skipped', detail);
+      setProgress(null, detail);
+      return;
+    }
+
+    if (step === 'pass_err') {
+      const rowMap = { A: 'step-passA', B: 'step-passB', C: 'step-passC', D: 'step-passD' };
+      const row = rowMap[_currentPass];
+      if (row) setStepState(row, 'error', detail);
+      setProgress(null, detail);
+      return;
+    }
+
+    // Map step → row and pct range
+    const map = STEP_MAP[step];
+    if (!map) return;
+
+    // Route pikepdf events to correct pass row based on _currentPass
+    let rowId = map.row;
+    if (step === 'pikepdf') {
+      rowId = _currentPass === 'D' ? 'step-passD' : 'step-passA';
+    }
+
+    if (map.range) {
+      const [lo, hi] = map.range;
+      const overall = lo + (pct / 100) * (hi - lo);
+      setProgress(Math.round(overall), detail);
+    } else {
+      setProgress(null, detail);
+    }
+
+    if (rowId) {
+      setStepState(rowId, pct >= 100 ? 'done' : 'active', detail);
+    }
+
+    if (step === 'select_best') setStepState('step-select', 'done', detail);
+    if (step === 'fallback')    setStepState('step-select', 'active', detail);
+    if (step === 'init' && pct >= 100) setStepState('step-init', 'done', detail);
+  }
+
+  function setProgress(pct, msg) {
+    if (pct !== null) {
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('progressPct').textContent = pct + '%';
+    }
+    if (msg) document.getElementById('progressMsg').textContent = msg;
+  }
+
+  function showProgress() {
+    document.getElementById('progressWrap').classList.add('visible');
+    document.getElementById('passSteps').classList.add('visible');
+    setProgress(0, 'Memulai…');
+  }
+
+  function hideProgress() {
+    setTimeout(() => {
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('progressPct').textContent = '100%';
+      setTimeout(() => {
+        document.getElementById('progressWrap').classList.remove('visible');
+      }, 600);
+    }, 200);
+  }
+
+  /* ================================================================
+     RUN — SSE stream from /compress/stream
+  ================================================================ */
+  document.getElementById('runBtn').addEventListener('click', async () => {
+    if (S.running || !S.file) return;
+
+    S.running = true;
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('runBtnText').textContent = 'Memproses…';
+    document.getElementById('results').classList.remove('visible');
+    document.getElementById('downloadBtn').classList.add('hidden');
+    setStatus('processing…');
+    resetSteps(S.mode);
+    showProgress();
+    log('Mengunggah dan memulai kompresi…', 'info');
+
+    const fd = new FormData();
+    fd.append('pdf',         S.file);
+    fd.append('mode',        S.mode);
+    fd.append('dpi',         String(S.dpi));
+    fd.append('jpeg_q',      String(S.jpegQ));
+    fd.append('grayscale',   String(S.grayscale));
+    fd.append('garbage',     String(S.garbage));
+    fd.append('deflate',     String(S.deflate));
+    fd.append('clean',       String(S.clean));
+    fd.append('pdf_setting', S.pdfSetting);
+    fd.append('scan_th',     String(S.scanTh));
+    fd.append('digital_th',  String(S.digitalTh));
+    fd.append('min_img',     String(S.minImg));
+    fd.append('max_size_gs', String(S.maxSizeGs));
+
+    try {
+      const res = await fetch('/compress/stream', { method: 'POST', body: fd });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let doneToken = null;
+      let doneInfo = null;
+
+      outer: while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        // Parse SSE lines
+        const lines = buf.split('\n');
+        buf = lines.pop(); // keep incomplete last line
+
+        let eventName = null;
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventName = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            if (eventName === 'progress') {
+              onProgressEvent(data);
+              log(`[${data.step}] ${data.detail}`, 'info');
+            } else if (eventName === 'done') {
+              doneToken = data.token;
+              doneInfo  = data.info;
+              break outer;
+            } else if (eventName === 'error') {
+              throw new Error(data.message);
+            }
+            eventName = null;
+          }
+        }
+      }
+
+      if (!doneToken) throw new Error('Stream selesai tanpa hasil.');
+
+      // Fetch the actual PDF blob using the token
+      setProgress(98, 'Mengunduh hasil…');
+      const dlRes = await fetch(`/compress/download/${doneToken}`);
+      if (!dlRes.ok) throw new Error('Gagal mengunduh hasil kompresi.');
+      const blob = await dlRes.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      hideProgress();
+      renderResults(doneInfo, blobUrl);
+      setStatus('done');
+
+    } catch (err) {
+      hideProgress();
+      setStatus('error');
+      log('ERROR: ' + err.message, 'err');
+      document.getElementById('statusPill').className = 'status-pill pill-err';
+      document.getElementById('statusPill').textContent = 'ERROR';
+      document.getElementById('mBefore').textContent = '—';
+      document.getElementById('mAfter').textContent  = '—';
+      document.getElementById('mSaved').textContent  = '—';
+      document.getElementById('mTime').textContent   = '—';
+      document.getElementById('results').classList.add('visible');
+
+    } finally {
+      S.running = false;
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('runBtnText').textContent = 'Jalankan Kompresi';
+    }
+  });
+
+  /* ================================================================
+     RENDER HASIL NYATA
+  ================================================================ */
+  function renderResults(d, blobUrl) {
+    const cls = d.detected_class;
+
+    document.getElementById('mBefore').textContent = fmt(d.before_bytes);
+    document.getElementById('mAfter').textContent  = fmt(d.after_bytes);
+    document.getElementById('mSaved').textContent  = d.saving_pct + '%';
+    document.getElementById('mTime').textContent   = Math.round(d.time_ms) + 'ms';
+
+    document.getElementById('rClass').innerHTML =
+      `<span class="class-badge cls-${cls}">${cls}</span>`;
+    document.getElementById('rMode').textContent       = d.mode_used;
+    document.getElementById('rPages').textContent      = d.pages;
+    document.getElementById('rRatio').textContent      = d.ratio.toFixed(4);
+    document.getElementById('rText').textContent       = d.avg_text_len_per_page;
+    document.getElementById('rImg').textContent        = d.avg_images_per_page;
+    document.getElementById('rThroughput').textContent = d.throughput_mb_s + ' MB/s';
+    document.getElementById('rGs').textContent         = d.gs_used ? '✓ ya' : '✗ tidak (fallback structural)';
+
+    document.getElementById('statusPill').className   = 'status-pill pill-ok';
+    document.getElementById('statusPill').textContent = 'SUCCESS';
+    document.getElementById('results').classList.add('visible');
+
+    // Blob URL — browser downloads directly, nothing stored on server
+    const dlBtn = document.getElementById('downloadBtn');
+    dlBtn.href = blobUrl;
+    dlBtn.download = 'compressed.pdf';
+    dlBtn.classList.remove('hidden');
+
+    log(`✓ Selesai — ${fmt(d.before_bytes)} → ${fmt(d.after_bytes)} (hemat ${d.saving_pct}%)`, 'ok');
+    log(`  Kelas: ${d.detected_class}  |  Mode: ${d.mode_used}  |  Halaman: ${d.pages}  |  Waktu: ${Math.round(d.time_ms)}ms`, 'ok');
+    if (!d.gs_used && (d.mode_used === 'DIGITAL' || d.mode_used === 'HYBRID')) {
+      log('  Ghostscript tidak digunakan — install GS untuk kompresi maksimal.', 'warn');
+    }
+  }
+
+  /* ================================================================
+     DARK MODE
+  ================================================================ */
+  let dark = false;
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    dark = !dark;
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
+    document.getElementById('themeBtn').textContent = dark ? 'light' : 'dark';
+  });
+
+  /* ================================================================
+     INIT
+  ================================================================ */
+  refreshCmd();
+  updateParamCards();
+  fetchStatus();
+</script>
+</body>
+</html>
