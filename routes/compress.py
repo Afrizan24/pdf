@@ -1,5 +1,5 @@
 """
-Routes: /preview, /compress/stream (SSE), /compress/download/<token>
+Flask routes: /preview, /compress/stream (SSE), /compress/download/<token>
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import tempfile
 import threading
 import time
 import uuid
+from collections import deque
 from typing import Dict
 
 from flask import Blueprint, Response, jsonify, request, send_file
@@ -20,23 +21,22 @@ from core.features import extract_features
 
 compress_bp = Blueprint("compress", __name__)
 
-# In-memory store: token → {"bytes": ..., "expires": float}
-# Entries expire after 5 minutes — user must download before then.
+# In-memory result store: token → {bytes, expires}.
+# Tokens expire after 5 minutes — client must download before then.
 _results: Dict[str, dict] = {}
 _results_lock = threading.Lock()
-_RESULT_TTL = 300  # seconds
+_RESULT_TTL   = 300  # seconds
 
 
 def _evict_expired() -> None:
     now = time.time()
     with _results_lock:
-        expired = [k for k, v in _results.items() if v["expires"] < now]
-        for k in expired:
+        for k in [k for k, v in _results.items() if v["expires"] < now]:
             del _results[k]
 
 
 # ---------------------------------------------------------------------------
-# /preview
+# /preview — extract features without compressing
 # ---------------------------------------------------------------------------
 
 @compress_bp.route("/preview", methods=["POST"])
@@ -54,34 +54,30 @@ def preview():
     try:
         feats = extract_features(tmp_path)
         return jsonify({
-            "pages": feats.pages,
-            "file_size_bytes": feats.file_size_bytes,
-            "total_text_len": feats.total_text_len,
-            "total_images": feats.total_images,
+            "pages":                 feats.pages,
+            "file_size_bytes":       feats.file_size_bytes,
+            "total_text_len":        feats.total_text_len,
+            "total_images":          feats.total_images,
             "avg_text_len_per_page": round(feats.avg_text_len_per_page, 2),
-            "avg_images_per_page": round(feats.avg_images_per_page, 2),
+            "avg_images_per_page":   round(feats.avg_images_per_page, 2),
+            "avg_image_area_ratio":  feats.avg_image_area_ratio,
+            "avg_text_area_ratio":   feats.avg_text_area_ratio,
+            "dominant_image_encoding": feats.dominant_image_encoding,
+            "bilevel_image_ratio":   round(feats.bilevel_image_ratio, 2),
         })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
 
 # ---------------------------------------------------------------------------
-# /compress/stream  — Server-Sent Events
+# /compress/stream — Server-Sent Events
 # ---------------------------------------------------------------------------
 
-@compress_bp.route("/compress/stream", methods=["POST"])
-def compress_stream():
-    file = request.files.get("pdf")
-    if not file or not file.filename:
-        return jsonify({"error": "No file uploaded."}), 400
-    if not file.filename.lower().endswith(".pdf"):
-        return jsonify({"error": "File must be a .pdf"}), 400
-
-    # ── Parse ALL params here, before any threading ──────────────────────
-    # request context is NOT available inside threads or generators in Flask dev server
+def _parse_params() -> dict:
+    """Parse all compression parameters from the current request form."""
     def _int(key, default):
         try:   return int(request.form.get(key, default))
         except: return default
@@ -92,14 +88,15 @@ def compress_stream():
 
     def _bool(key, default=False):
         val = request.form.get(key)
-        if val is None: return default
+        if val is None:
+            return default
         return val.lower() in ("true", "1", "yes", "on")
 
-    params = {
+    return {
         "mode":        request.form.get("mode", "AUTO").upper(),
         "dpi":         _int("dpi", 150),
         "jpeg_q":      _int("jpeg_q", 75),
-        "grayscale":   _bool("grayscale", False),
+        "grayscale":   _bool("grayscale"),
         "garbage":     _int("garbage", 4),
         "deflate":     _bool("deflate", True),
         "clean":       _bool("clean", True),
@@ -107,13 +104,23 @@ def compress_stream():
         "scan_th":     _int("scan_th", 20),
         "digital_th":  _int("digital_th", 200),
         "min_img":     _float("min_img", 1.0),
-        "max_size_gs": _float("max_size_gs", 50.0),
+        "max_size_gs": _float("max_size_gs", 200.0),
     }
 
+
+@compress_bp.route("/compress/stream", methods=["POST"])
+def compress_stream():
+    file = request.files.get("pdf")
+    if not file or not file.filename:
+        return jsonify({"error": "No file uploaded."}), 400
+    if not file.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "File must be a .pdf"}), 400
+
+    # Parse params before spawning threads — request context is not thread-safe.
+    params = _parse_params()
     if params["mode"] not in ("AUTO", "DIGITAL", "SCAN", "HYBRID"):
         return jsonify({"error": f"Invalid mode: {params['mode']}"}), 400
 
-    # Save upload to disk before streaming — file object is not thread-safe
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         file.save(tmp.name)
         tmp_path = tmp.name
@@ -122,16 +129,13 @@ def compress_stream():
         def sse(event: str, data: dict) -> str:
             return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
+        queue: deque = deque()  # thread-safe for append/popleft
+
         def on_progress(step: str, pct: int, detail: str) -> None:
-            yield_queue.append(sse("progress", {
-                "step": step, "pct": pct, "detail": detail
-            }))
+            queue.append(sse("progress", {"step": step, "pct": pct, "detail": detail}))
 
-        yield_queue = []
-
-        # Run compression in a thread so we can yield SSE from generator
-        result_holder = {}
-        error_holder = {}
+        result_holder: dict = {}
+        error_holder:  dict = {}
 
         def run():
             try:
@@ -152,44 +156,43 @@ def compress_stream():
                     progress_cb=on_progress,
                 )
                 result_holder["bytes"] = pdf_bytes
-                result_holder["info"] = info
-            except Exception as e:
-                error_holder["msg"] = str(e)
+                result_holder["info"]  = info
+            except Exception as exc:
+                error_holder["msg"] = str(exc)
             finally:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
                 result_holder["done"] = True
 
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
+        threading.Thread(target=run, daemon=True).start()
 
-        # Stream progress events while thread runs
         while not result_holder.get("done") and not error_holder:
-            while yield_queue:
-                yield yield_queue.pop(0)
+            while queue:
+                yield queue.popleft()
             time.sleep(0.05)
 
-        # Drain remaining events
-        while yield_queue:
-            yield yield_queue.pop(0)
+        while queue:
+            yield queue.popleft()
 
         if error_holder:
             yield sse("error", {"message": error_holder["msg"]})
             return
 
-        # Store result for download
         _evict_expired()
         token = str(uuid.uuid4())
         with _results_lock:
             _results[token] = {
-                "bytes": result_holder["bytes"],
+                "bytes":   result_holder["bytes"],
                 "expires": time.time() + _RESULT_TTL,
             }
 
         yield sse("done", {"token": token, "info": result_holder["info"]})
 
-    return Response(generate(), mimetype="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +206,7 @@ def compress_download(token: str):
         entry = _results.pop(token, None)
 
     if not entry:
-        return jsonify({"error": "Token tidak valid atau sudah kadaluarsa."}), 404
+        return jsonify({"error": "Token invalid or expired."}), 404
 
     buf = io.BytesIO(entry["bytes"])
     buf.seek(0)

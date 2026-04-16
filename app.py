@@ -1,21 +1,18 @@
-"""
-Flask entry point — Adaptive PDF Compressor
-"""
+"""Flask application entry point — Adaptive PDF Compressor."""
 
 import os
+
 from flask import Flask, render_template
 
 from routes.compress import compress_bp
 from routes.files import files_bp
 
 app = Flask(__name__)
-
-# uploads/ still needed as a fallback landing spot; cleaned per-request via tempfile
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 app.register_blueprint(compress_bp)
 app.register_blueprint(files_bp)
+
+# Ensure the uploads directory exists (used as a fallback temp location).
+os.makedirs("uploads", exist_ok=True)
 
 
 @app.route("/")
