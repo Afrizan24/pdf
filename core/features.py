@@ -9,6 +9,37 @@ from typing import Dict, List, Tuple
 import fitz  # PyMuPDF
 
 
+def _union_area(rects: List[fitz.Rect]) -> float:
+    """
+    Compute the total area covered by a list of (possibly overlapping) rects.
+
+    Uses a simple sweep: sort by x0, then greedily merge overlapping rects
+    into a coverage set.  For the small number of images per page this is
+    fast enough without a full interval-tree.
+    """
+    if not rects:
+        return 0.0
+    # Sort by top-left x then y for deterministic merging
+    rects = sorted(rects, key=lambda r: (r.x0, r.y0))
+    merged: List[fitz.Rect] = []
+    for r in rects:
+        if not merged:
+            merged.append(fitz.Rect(r))
+            continue
+        last = merged[-1]
+        # Check if r overlaps with last (simple 2-D overlap test)
+        if r.x0 < last.x1 and r.y0 < last.y1 and r.x1 > last.x0 and r.y1 > last.y0:
+            # Expand last to cover both
+            merged[-1] = fitz.Rect(
+                min(last.x0, r.x0), min(last.y0, r.y0),
+                max(last.x1, r.x1), max(last.y1, r.y1),
+            )
+        else:
+            merged.append(fitz.Rect(r))
+    return sum(r.width * r.height for r in merged)
+
+
+
 @dataclass
 class PdfFeatures:
     """Extracted features used for pipeline routing and classification."""
@@ -101,20 +132,21 @@ def _compute_area_ratios(doc: fitz.Document, sample_indices: List[int]) -> Tuple
 
             # ── Image area ────────────────────────────────────────────────
             # get_image_rects returns the on-page bounding boxes of all images.
-            # We union-clip overlapping rects to avoid double-counting.
-            img_area = 0.0
+            # We union overlapping rects before summing to avoid double-counting.
+            img_rects: List[fitz.Rect] = []
             for img_info in page.get_images(full=True):
                 xref = img_info[0]
                 try:
                     rects = page.get_image_rects(xref)
                     for r in rects:
-                        # Clip to page bounds and accumulate
                         clipped = r & page.rect
                         if not clipped.is_empty:
-                            img_area += clipped.width * clipped.height
+                            img_rects.append(clipped)
                 except Exception:
                     continue
-            # Cap at 1.0 (overlapping images can sum > page area)
+
+            # Union-merge overlapping rects to avoid double-counting.
+            img_area = _union_area(img_rects)
             img_ratios.append(min(img_area / page_area, 1.0))
 
             # ── Text area ─────────────────────────────────────────────────

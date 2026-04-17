@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""CLI entry point for Adaptive PDF Compressor. Core logic lives in core/."""
+"""CLI entry point for PDF Compression Research Tool. Core logic lives in core/."""
 
 import argparse
 
-from core import compress, GS_EXECUTABLE, JBIG2_EXECUTABLE
+from core import compress, COMPRESSION_LEVELS, GS_EXECUTABLE, JBIG2_EXECUTABLE
 
 
 def _fmt(b: int) -> str:
@@ -14,50 +14,58 @@ def _fmt(b: int) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Adaptive PDF Compressor — output is always a valid .pdf"
+        description="PDF Compression Research Tool — two-pass pipeline: Ghostscript + pikepdf"
     )
     ap.add_argument("input",  help="Input PDF path")
     ap.add_argument("output", help="Output PDF path")
 
-    ap.add_argument("--mode",            default="AUTO",
-                    choices=["AUTO", "DIGITAL", "SCAN", "HYBRID"])
-    ap.add_argument("--dpi",             type=int,   default=150,
-                    help="Target DPI for SCAN rasterisation (default: 150)")
-    ap.add_argument("--jpeg-q",          type=int,   default=75,
-                    help="JPEG quality 20–95 (default: 75)")
-    ap.add_argument("--grayscale",       action="store_true",
-                    help="Force grayscale output")
-    ap.add_argument("--pdf-setting",     default="/ebook",
+    ap.add_argument("--mode", default="AUTO",
+                    choices=["AUTO", "DIGITAL", "SCAN", "HYBRID"],
+                    help="Classification mode (default: AUTO)")
+    ap.add_argument("--level", default="MEDIUM",
+                    choices=["HIGH", "MEDIUM", "LOW"],
+                    help="Compression level preset (default: MEDIUM)")
+    ap.add_argument("--pdf-setting", default=None,
                     choices=["/screen", "/ebook", "/printer", "/prepress"],
-                    help="Ghostscript PDFSETTINGS preset (default: /ebook)")
-    ap.add_argument("--garbage",         type=int,   default=4,
-                    help="PyMuPDF garbage collection level 0–4 (default: 4)")
-    ap.add_argument("--no-deflate",      action="store_true",
-                    help="Disable stream deflation in structural pass")
-    ap.add_argument("--no-clean",        action="store_true",
-                    help="Disable PDF structure cleaning")
-    ap.add_argument("--scan-text-th",    type=int,   default=20,
-                    help="Avg chars/page below which a doc is considered SCAN (default: 20)")
-    ap.add_argument("--digital-text-th", type=int,   default=200,
-                    help="Avg chars/page above which a doc is considered DIGITAL (default: 200)")
-    ap.add_argument("--min-img-scan",    type=float, default=1.0,
+                    help="Override GS PDFSETTINGS preset (default: from level)")
+    ap.add_argument("--color-dpi", type=int, default=None,
+                    help="Override colour image downsample DPI (default: from level)")
+    ap.add_argument("--gray-dpi", type=int, default=None,
+                    help="Override grayscale image downsample DPI (default: from level)")
+    ap.add_argument("--mono-dpi", type=int, default=None,
+                    help="Override monochrome image downsample DPI (default: from level)")
+    ap.add_argument("--jpeg-quality", type=int, default=None,
+                    help="Override JPEG quality 20-100 (default: auto from DPI)")
+    ap.add_argument("--grayscale", action="store_true",
+                    help="Convert all colour to grayscale")
+    ap.add_argument("--no-pikepdf", action="store_true",
+                    help="Disable pikepdf structural optimization (Pass B)")
+    ap.add_argument("--scan-text-th", type=int, default=20,
+                    help="Avg chars/page below which a doc is SCAN (default: 20)")
+    ap.add_argument("--digital-text-th", type=int, default=200,
+                    help="Avg chars/page above which a doc is DIGITAL (default: 200)")
+    ap.add_argument("--min-img-scan", type=float, default=1.0,
                     help="Min avg images/page to classify as SCAN (default: 1.0)")
+    ap.add_argument("--max-size-gs", type=float, default=200.0,
+                    help="Max file size in MB to process with GS (default: 200)")
 
     args = ap.parse_args()
 
     result_bytes, info = compress(
         in_path=args.input,
         mode=args.mode,
-        dpi=args.dpi,
-        jpeg_quality=args.jpeg_q,
-        grayscale=args.grayscale,
-        garbage=args.garbage,
-        deflate=not args.no_deflate,
-        clean=not args.no_clean,
+        level=args.level,
         pdf_setting=args.pdf_setting,
+        color_dpi=args.color_dpi,
+        gray_dpi=args.gray_dpi,
+        mono_dpi=args.mono_dpi,
+        jpeg_quality=args.jpeg_quality,
+        grayscale=args.grayscale,
+        pikepdf_optimize=not args.no_pikepdf,
         scan_text_threshold=args.scan_text_th,
         digital_text_threshold=args.digital_text_th,
         min_images_for_scan=args.min_img_scan,
+        max_size_for_gs_mb=args.max_size_gs,
     )
 
     with open(args.output, "wb") as f:
@@ -78,9 +86,17 @@ def main() -> None:
     print(f"  Image area ratio   : {info.get('avg_image_area_ratio', 0):.0%}")
     print(f"  Text area ratio    : {info.get('avg_text_area_ratio', 0):.0%}")
     print(f"  Detected class     : {info['detected_class']}")
-    print(f"  Mode used          : {info['mode_used']}")
-    if info.get("dpi_used"):
-        print(f"  DPI used           : {info['dpi_used']}")
+    print(f"  Confidence         : {info['classification_confidence']}")
+
+    print("\n=== COMPRESSION PARAMS ===")
+    print(f"  Mode               : {info['mode_used']}")
+    print(f"  Level              : {info['level_used']}")
+    print(f"  GS preset          : {info['pdf_setting_used']}")
+    print(f"  Color DPI          : {info['color_dpi_used']}")
+    print(f"  Gray DPI           : {info['gray_dpi_used']}")
+    print(f"  Mono DPI           : {info['mono_dpi_used']}")
+    print(f"  Grayscale          : {info['grayscale']}")
+    print(f"  pikepdf Pass B     : {info['pikepdf_optimize']}")
     print(f"  Ghostscript        : {gs_status}")
     print(f"  GS used            : {info['gs_used']}")
     print(f"  JBIG2enc           : {jbig2_status}")

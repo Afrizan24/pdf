@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Strip BOM from Python files",
+  "description": "Removes UTF-8 BOM (byte order mark) from Python files after they are edited, preventing SyntaxError on parse",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.py"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "python -c \"import sys; f=sys.argv[1]; b=open(f,'rb').read(); open(f,'wb').write(b[3:] if b[:3]==b'\\xef\\xbb\\xbf' else b)\" -- \"${file}\""
+  }
+}
