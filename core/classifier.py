@@ -2,10 +2,10 @@
 Rule-based PDF classifier — strict single-pass routing per spec.
 
 Classification priority (highest to lowest):
-  1. bilevel_ratio >= 0.5                          → SCAN  (CCITT/JBIG2 fax)
-  2. image_area >= 0.9 AND text_length ≈ 0         → SCAN  (pure photo scan)
-  3. text_area  >= 0.8 AND image_area < 0.2        → DIGITAL
-  4. everything else                               → HYBRID
+  1. Only text (text_area > 0 and image_area == 0) -> DIGITAL
+  2. Only image (image_area > 0 and text_area == 0) -> SCAN
+  3. Both text and image (text_area > 0 and image_area > 0) -> HYBRID
+  4. Empty / unknown -> HYBRID
 """
 
 from __future__ import annotations
@@ -47,36 +47,31 @@ def classify_pdf_with_confidence(
 
     Rules applied in strict priority order:
 
-    Rule 1 — bilevel_ratio >= 0.5
-        Majority of images are 1-bit (CCITT fax / JBIG2).
-        These are scanned documents. → SCAN (hard)
+    Rule 1 — text_area > 0 AND image_area == 0
+        Page is mostly text with no imagery.
+        Born-digital document. → DIGITAL (hard)
 
-    Rule 2 — image_area >= 0.9 AND avg_text_len_per_page < _SCAN_TEXT_ZERO_CEILING
-        Page is almost entirely image with negligible text.
+    Rule 2 — image_area > 0 AND text_area == 0
+        Page is almost entirely image with no text.
         Treat as a photo scan. → SCAN (hard)
 
-    Rule 3 — text_area >= 0.8 AND image_area < 0.2
-        Page is mostly text with very little imagery.
-        Born-digital document. → DIGITAL (medium)
+    Rule 3 — text_area > 0 AND image_area > 0
+        Has both text and images. → HYBRID (medium)
 
-    Rule 4 — everything else → HYBRID (weak)
+    Rule 4 — everything else (e.g. empty) → HYBRID (weak)
     """
     bilevel   = feats.bilevel_image_ratio
     img_area  = feats.avg_image_area_ratio
     text_area = feats.avg_text_area_ratio
     avg_text  = feats.avg_text_len_per_page
 
-    # Rule 1 — bilevel majority
-    if bilevel >= 0.5:
+    if text_area > 0 and img_area == 0:
+        return "DIGITAL", "hard"
+
+    if img_area > 0 and text_area == 0:
         return "SCAN", "hard"
 
-    # Rule 2 — image-dominant with no meaningful text
-    if img_area >= 0.9 and avg_text < _SCAN_TEXT_ZERO_CEILING:
-        return "SCAN", "hard"
+    if text_area > 0 and img_area > 0:
+        return "HYBRID", "medium"
 
-    # Rule 3 — text-dominant
-    if text_area >= 0.8 and img_area < 0.2:
-        return "DIGITAL", "medium"
-
-    # Rule 4 — mixed / ambiguous
     return "HYBRID", "weak"

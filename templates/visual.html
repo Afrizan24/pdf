@@ -1222,10 +1222,13 @@
                 </div>
               </div>
 
-              <div style="margin-top:24px;">
+              <div style="margin-top:24px; display:flex; gap:12px; justify-content:center;">
                 <a href="#" id="exportBtn" class="btn"
                   style="background:var(--accent);color:#fff;display:none;width:auto;padding:12px 32px;"
                   onclick="exportLog(event)">Export Log Analisis (Excel)</a>
+                <button class="btn" id="resetBtn"
+                  style="background:var(--surface2);color:var(--text);border:1px solid var(--border);display:none;width:auto;padding:12px 32px;"
+                  onclick="window.location.reload()">🔄 Mulai Ulang (File Baru)</button>
               </div>
 
             </div>
@@ -1789,6 +1792,8 @@
           }
 
           document.getElementById('exportBtn').style.display = 'inline-flex';
+          const rBtn = document.getElementById('resetBtn');
+          if (rBtn) rBtn.style.display = 'inline-flex';
 
         }).catch(e => {
           loadingBtn(7, false);
