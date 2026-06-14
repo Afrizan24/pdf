@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Step-by-Step Visual PDF Compression</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #f5f4f0;
+      --surface: #fff;
+      --surface2: #f0efe9;
+      --border: #d8d6cc;
+      --border2: #c4c2b6;
+      --text: #1a1916;
+      --text2: #6b6960;
+      --text3: #9e9d97;
+      --accent: #2d5cf6;
+      --accent-hover: #1c44c2;
+      --green: #3b6d11;
+      --green-bg: #eaf3de;
+      --red: #a32d2d;
+      --red-bg: #fcebeb;
+      --r-sm: 6px;
+      --r-md: 10px;
+      --r-lg: 16px;
+    }
+
+    [data-theme="dark"] {
+      --bg: #141412;
+      --surface: #1e1d1a;
+      --surface2: #252420;
+      --border: #333230;
+      --border2: #444240;
+      --text: #f0ede8;
+      --text2: #9a9890;
+      --text3: #5e5d57;
+      --accent: #5b82ff;
+      --accent-hover: #82a0ff;
+      --green: #c0dd97;
+      --green-bg: #173404;
+      --red: #f7c1c1;
+      --red-bg: #501313;
+    }
+
+    html,
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.5;
+      transition: background .2s, color .2s;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      border: 1.5px solid var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .topbar-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -.3px;
+      flex: 1;
+    }
+
+    .theme-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text2);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+
+    /* Step styling - Two Column */
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 24px;
+      position: relative;
+      opacity: 0.5;
+      transition: opacity .3s, transform .3s;
+      transform: translateY(10px);
+      pointer-events: none;
+      display: flex;
+      gap: 32px;
+    }
+
+    .step-card.active {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      border-color: var(--accent);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.04);
+    }
+
+    .step-card.done {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      border-color: var(--border);
+    }
+
+    .step-left {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .step-right {
+      width: 380px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px dashed var(--border);
+      padding-left: 32px;
+    }
+
+    @media(max-width: 900px) {
+      .step-card {
+        flex-direction: column;
+      }
+
+      .step-right {
+        width: 100%;
+        border-left: none;
+        border-top: 1px dashed var(--border);
+        padding-left: 0;
+        padding-top: 24px;
+      }
+    }
+
+    .step-hdr {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .step-num {
+      width: 36px;
+      height: 36px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .step-card.active .step-num {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .step-card.done .step-num {
+      background: var(--green-bg);
+      color: var(--green);
+      border-color: var(--green-bg);
+    }
+
+    .step-title {
+      font-size: 18px;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .step-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text3);
+    }
+
+    .btn {
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--r-md);
+      padding: 12px 24px;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .btn:hover:not(:disabled) {
+      opacity: .85;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .params-box {
+      margin-top: 16px;
+      background: var(--surface2);
+      border: 1px dashed var(--border2);
+      border-radius: var(--r-sm);
+      padding: 12px 16px;
+    }
+
+    .params-box p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text2);
+      margin: 4px 0;
+      line-height: 1.4;
+    }
+
+    .params-box span.lbl {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    /* Tuning Group */
+    .tuning-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .tuning-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tuning-item.full {
+      grid-column: 1 / -1;
+    }
+
+    .tuning-item label {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--text2);
+    }
+
+    .tuning-item input[type="number"],
+    .tuning-item select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+      width: 100%;
+    }
+
+    .tuning-item input[type="number"]:focus,
+    .tuning-item select:focus {
+      outline: none;
+      border-color: var(--text);
+    }
+
+    /* File upload zone */
+    .drop-zone {
+      border: 2px dashed var(--border2);
+      border-radius: var(--r-md);
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+      background: var(--surface2);
+    }
+
+    .drop-zone:hover {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .drop-zone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon {
+      font-size: 32px;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    /* Visual Results */
+    .visual-res {
+      display: flex;
+      gap: 24px;
+      opacity: 0;
+      transition: opacity .3s;
+    }
+
+    .visual-res.visible {
+      opacity: 1;
+    }
+
+    .thumb-wrap {
+      width: 180px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .thumb-img {
+      width: 100%;
+      aspect-ratio: 1/1.4;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      transition: transform 0.3s ease;
+      transform-origin: center top;
+    }
+
+    .thumb-img:hover {
+      transform: scale(1.5);
+      z-index: 20;
+      position: relative;
+    }
+
+    .res-data {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .res-stat {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--surface2);
+      padding-bottom: 8px;
+    }
+
+    .res-lbl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text2);
+      width: 120px;
+    }
+
+    .res-val {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .chart-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      width: 100%;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .chart-fill {
+      height: 100%;
+      background: var(--text);
+      width: 0%;
+      transition: width .5s ease;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      width: 100%;
+    }
+
+    /* Timeline Table */
+    .timeline-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--surface);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .timeline-table th,
+    .timeline-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      color: var(--text);
+    }
+
+    .timeline-table th {
+      background: var(--surface2);
+      color: var(--text2);
+      font-weight: 700;
+    }
+
+    .timeline-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .cls-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .cls-SCAN {
+      background: #faeeda;
+      color: #854f0b;
+    }
+
+    .cls-DIGITAL {
+      background: #e6f1fb;
+      color: #185fa5;
+    }
+
+    .cls-HYBRID {
+      background: #eeedfe;
+      color: #534ab7;
+    }
+
+    /* Educational Infobox (Tujuan Ilmiah) */
+    .edu-box {
+      margin-top: 16px;
+      background: var(--surface2);
+      border-left: 4px solid var(--accent);
+      padding: 12px 16px;
+      border-radius: 4px;
+    }
+
+    .edu-box h5 {
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .edu-box p {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* Horizontal Size Comparison Bar */
+    .comp-wrapper {
+      margin-top: 24px;
+    }
+
+    .comp-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .comp-label {
+      width: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text2);
+      font-weight: 700;
+    }
+
+    .comp-track {
+      flex: 1;
+      background: var(--border);
+      height: 24px;
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .comp-fill {
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+    }
+
+    .comp-val {
+      font-size: 14px;
+      font-weight: 700;
+      width: 80px;
+      text-align: right;
+    }
+
+    .comp-delta {
+      font-size: 12px;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .loader {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      display: none;
+    }
+
+    .btn.loading .loader {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .helper-text {
+      font-size: 11px;
+      color: var(--text3);
+      font-style: italic;
+      margin-top: 4px;
+      display: block;
+      line-height: 1.3;
+    }
+
+    /* ZONASI */
+    .zone-container {
+      margin-bottom: 20px;
+      padding: 32px;
+      border-radius: var(--r-lg);
+      background: var(--bg);
+      border: 2px dashed var(--border);
+    }
+
+    .zone-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .zone-icon {
+      font-size: 28px;
+    }
+
+    .zone-title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+    }
+
+    .zone-desc {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--text2);
+      margin-top: 4px;
+    }
+
+    .step-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+      </svg></div>
+    <div class="topbar-title">Step-by-Step Visual PDF Compression</div>
+    <a href="/" style="font-size:12px;color:var(--text2);text-decoration:none;">&larr; Back to Dashboard</a>
+    <button class="theme-btn" onclick="toggleTheme()">dark</button>
+  </div>
+
+  <div class="container">
+
+    <!-- ZONA 1 -->
+    <div class="zone-container">
+      <div class="zone-header">
+        <div>
+          <div class="zone-title">Analisis & Pengambilan Keputusan</div>
+          <div class="zone-desc">Fase pembacaan data matematis (tanpa rendering visual) dan penentuan rute algoritma
+            secara otomatis.</div>
+        </div>
+      </div>
+      <div class="step-wrapper">
+
+        <!-- STEP 1: INPUT -->
+        <div class="step-card active" id="step1">
+          <div class="step-left">
+            <div class="visual-res" id="res1" style="display:none; flex-wrap:wrap;">
+              <div style="display:flex; width:100%; gap:24px;">
+                <div class="thumb-wrap">
+                  <div style="font-size:10px;font-family:monospace;margin-bottom:6px;color:var(--text2);">FILE ASLI</div>
+                <img id="thumb1" class="thumb-img" src="" alt="PDF Thumbnail">
+              </div>
+              <div class="res-data">
+                <div class="res-stat">
+                  <div class="res-lbl">NAMA FILE</div>
+                  <div class="res-val" id="fn1" style="font-size:14px;">-</div>
+                </div>
+                <div class="res-stat">
+                  <div class="res-lbl">UKURAN AWAL</div>
+                  <div class="res-val" id="sz1">-</div>
+                </div>
+                <div class="res-stat">
+                  <div class="res-lbl">JML HALAMAN</div>
+                  <div class="res-val" id="pg1">-</div>
+                </div>
+                <div style="margin-top:20px; font-style:italic; color:var(--text3); font-size:13px;">
+                  File siap. Lanjutkan ke langkah berikutnya di panel kanan.
+                </div>
+              </div>
+              <div style="width:160px; height:120px; display:flex; flex-direction:column; align-items:center;">
+                <span
+                  style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--text2); margin-bottom:-20px; z-index:1;">200MB
+                  Limit</span>
+                <canvas id="sizeLimitChart"></canvas>
+              </div>
+              </div>
+              <div id="anat1" style="width:100%; margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <div class="step-right">
+            <div class="step-hdr">
+              <div class="step-num">1</div>
+              <div class="step-title">Input File</div>
+              <div class="step-status" id="s1-status">Waiting</div>
+            </div>
+            <div class="drop-zone" id="dz">
+              <input type="file" id="fileIn" accept=".pdf">
+              <span class="drop-icon">📄</span>
+              <strong style="font-size:16px;">Drop PDF disini</strong>
+              <div style="font-size:12px;color:var(--text2);margin-top:8px;">Hanya .pdf (Max 200MB)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2: EXTRACTION -->
+        <div class="step-card" id="step2">
+          <div class="step-left">
+            <div class="visual-res" id="res2" style="display:none;">
+              <div class="metrics-grid">
+                <div>
+                  <div class="res-lbl" style="width:100%;">KALKULASI RASIO TEKS</div>
+                  <div class="res-val" id="textRat">0%</div>
+                  <div class="chart-bar">
+                    <div class="chart-fill" id="textFill"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="res-lbl" style="width:100%;">KALKULASI RASIO GAMBAR (R_img)</div>
+                  <div class="res-val" id="imgRat">0%</div>
+                  <div class="chart-bar">
+                    <div class="chart-fill" id="imgFill"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="res-lbl" style="width:100%;">GAMBAR 1-BIT (BILEVEL)</div>
+                  <div class="res-val" id="bilRat">0%</div>
+                  <div class="chart-bar">
+                    <div class="chart-fill" id="bilFill"></div>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;justify-content:center;">
+                  <div class="res-stat" style="border:none;">
+                    <div class="res-lbl" style="width:160px;">KARAKTER TEKS (C_text)</div>
+                    <div class="res-val" style="font-size:14px;" id="ctext">-</div>
+                  </div>
+                  <div class="res-stat" style="border:none;">
+                    <div class="res-lbl" style="width:160px;">GAMBAR</div>
+                    <div class="res-val" style="font-size:14px;" id="images">-</div>
+                  </div>
+                  <div class="res-stat" style="border:none;">
+                    <div class="res-lbl" style="width:160px;">DOM. ENC</div>
+                    <div class="res-val" style="font-size:14px;" id="enc">-</div>
+                  </div>
+                </div>
+              </div>
+              <div
+                style="width:200px; height:200px; margin: 0 auto; display:flex; flex-direction:column; justify-content:center;">
+                <canvas id="areaChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-right">
+            <div class="step-hdr">
+              <div class="step-num">2</div>
+              <div class="step-title">Ekstraksi Fitur</div>
+              <div class="step-status" id="s2-status">Locked</div>
+            </div>
+            <button class="btn" id="btn2" onclick="runExtract()">
+              <span class="loader"></span> <span>Mulai Ekstraksi</span>
+            </button>
+            <div class="edu-box">
+              <h5>Tujuan Ilmiah</h5>
+              <p>Mengekstrak data area piksel vs area teks secara matematis menggunakan PyMuPDF sebagai basis penentuan
+                parameter dinamis, tanpa merender visual gambar.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: CLASSIFICATION -->
+        <div class="step-card" id="step3">
+          <div class="step-left">
+            <div class="visual-res" id="res3" style="display:none;flex-direction:row;align-items:center;gap:24px;">
+              <div style="display:flex;flex-direction:column;flex:1;">
+                <div
+                  style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);margin-bottom:8px;">
+                  HASIL KEPUTUSAN:</div>
+                <div>
+                  <span class="cls-badge" id="clsBadge">-</span>
+                  <span style="font-family:monospace;font-size:14px;font-weight:bold;margin-left:8px;"
+                    id="clsConf"></span>
+                </div>
+                <div
+                  style="background:var(--surface2);padding:16px;border-radius:8px;border-left:4px solid var(--accent);font-size:14px;font-family:monospace;line-height:1.6;"
+                  id="clsReason">-</div>
+                <div style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);">
+                  TARGET SWEET SPOT:</div>
+                <div style="font-family:monospace;font-size:13px;font-weight:bold;color:var(--accent);" id="clsTarget">-
+                </div>
+              </div>
+              <div style="width:160px; height:120px; display:flex; flex-direction:column; align-items:center;">
+                <span
+                  style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--text2); margin-bottom:-20px; z-index:1;">Confidence</span>
+                <canvas id="confChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-right">
+            <div class="step-hdr">
+              <div class="step-num">3</div>
+              <div class="step-title">Klasifikasi</div>
+              <div class="step-status" id="s3-status">Locked</div>
+            </div>
+
+            <div class="tuning-group" style="display:none;"></div>
+
+            <button class="btn" id="btn3" onclick="runClassify()">
+              <span class="loader"></span> <span>Klasifikasikan</span>
+            </button>
+            <div class="edu-box">
+              <h5>Tujuan Ilmiah</h5>
+              <p>Mengkategorikan dokumen secara algoritmik (Digital/Scan/Hybrid) untuk membuktikan bahwa tidak ada
+                <i>one-size-fits-all</i> dalam kompresi PDF.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- End Step Wrapper -->
+    </div> <!-- End Zona 1 -->
+
+    <!-- ZONA 2 -->
+    <div class="zone-container">
+      <div class="zone-header">
+        <div>
+          <div class="zone-title">Eksekusi Kompresi Adaptif</div>
+          <div class="zone-desc">Fase penerapan optimasi berlapis menggunakan Ghostscript (Lossy) dan PikePDF
+            (Lossless).</div>
+        </div>
+      </div>
+      <div class="step-wrapper">
+
+        <!-- STEP 4: GHOSTSCRIPT -->
+        <div class="step-card" id="step4">
+          <div class="step-left">
+            <div class="visual-res" id="res4" style="display:none; flex-wrap:wrap;">
+              <div style="display:flex;gap:24px;width:100%;">
+                <div class="thumb-wrap">
+                  <div style="font-size:10px;font-family:monospace;margin-bottom:6px;color:var(--accent);">OUTPUT
+                    GHOSTSCRIPT</div>
+                  <img id="thumb4" class="thumb-img" src="" alt="GS Thumbnail">
+                </div>
+                <div class="res-data">
+                  <div class="res-stat">
+                    <div class="res-lbl">UKURAN BARU</div>
+                    <div class="res-val" id="sz4">-</div>
+                  </div>
+                  <div class="res-stat">
+                    <div class="res-lbl">WAKTU PROSES</div>
+                    <div class="res-val" style="font-size:14px;" id="tm4">-</div>
+                  </div>
+                  <div
+                    style="background:var(--surface2);padding:12px;border-radius:6px;font-family:monospace;font-size:11px;color:var(--text2);word-break:break-all;line-height:1.5;">
+                    <span style="color:var(--text);font-weight:bold;">EXECUTED:</span> <span id="gsCmdText">Menunggu
+                      klasifikasi...</span>
+                  </div>
+                  <div id="gsChecklist"
+                    style="display:none;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);line-height:1.8;">
+                    <div id="gsStep1">⏳ Executing Discrete Cosine Transform (DCT)...</div>
+                    <div id="gsStep2" style="opacity:0.3;">⏳ Executing MD5 Pattern Matching...</div>
+                    <div id="gsStep3" style="opacity:0.3;">⏳ Executing Font Subsetting...</div>
+                  </div>
+                  <div id="gsWarn"
+                    style="color:var(--red);font-size:12px;font-weight:bold;display:none;margin-top:8px;">⚠️ Ukuran
+                    membesar, sistem akan fallback ke file asli di tahap akhir.</div>
+                </div>
+              </div>
+              <div style="width:100%;height:120px;margin-top:16px;">
+                <canvas id="gsChart"></canvas>
+              </div>
+              <div id="anat4" style="width:100%; margin-top:8px;"></div>
+            </div>
+          </div>
+
+          <div class="step-right">
+            <div class="step-hdr">
+              <div class="step-num">4</div>
+              <div class="step-title">Ghostscript Pass</div>
+              <div class="step-status" id="s4-status">Locked</div>
+            </div>
+
+            <div class="tuning-group">
+              <div class="tuning-item full">
+                <label>GS Preset (PDFSETTINGS)</label>
+                <select id="tune_gs_preset">
+                  <option value="">-- Auto (berdasarkan klasifikasi) --</option>
+                  <option value="/screen">/screen (Resolusi rendah 72dpi)</option>
+                  <option value="/ebook">/ebook (Resolusi menengah 150dpi)</option>
+                  <option value="/printer">/printer (Resolusi tinggi 300dpi)</option>
+                </select>
+              </div>
+              <div class="tuning-item">
+                <label>Color DPI</label>
+                <input type="number" id="tune_color_dpi" placeholder="auto">
+              </div>
+              <div class="tuning-item">
+                <label>Gray DPI</label>
+                <input type="number" id="tune_gray_dpi" placeholder="auto">
+              </div>
+              <div class="tuning-item">
+                <label>Mono DPI</label>
+                <input type="number" id="tune_mono_dpi" placeholder="auto">
+              </div>
+              <div class="tuning-item">
+                <label>JPEG Quality</label>
+                <input type="number" id="tune_jpeg" placeholder="auto">
+              </div>
+              <div class="tuning-item full" style="flex-direction:row;align-items:center;gap:8px;margin-top:6px;">
+                <input type="checkbox" id="tune_gray" style="width:auto;transform:scale(1.2);">
+                <label style="font-size:13px;cursor:pointer;" for="tune_gray">Convert to Grayscale</label>
+              </div>
+            </div>
+
+            <button class="btn" id="btn4" onclick="runGS()">
+              <span class="loader"></span> <span>Run Ghostscript</span>
+            </button>
+
+            <div class="edu-box">
+              <h5>Tujuan Ilmiah</h5>
+              <p>Melakukan kompresi <b>visual dan data piksel</b>. Algoritma ini menurunkan resolusi gambar
+                (downsampling) dan menyeleksi karakter teks yang terpakai saja (font subsetting).</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 5: PIKEPDF -->
+        <div class="step-card" id="step5">
+          <div class="step-left">
+            <div class="visual-res" id="res5" style="display:none;flex-direction:column;">
+              <div style="display:flex;gap:24px;">
+                <div class="thumb-wrap">
+                  <div style="font-size:10px;font-family:monospace;margin-bottom:6px;color:var(--green);">OUTPUT FINAL
+                  </div>
+                  <img id="thumb5" class="thumb-img" src="" alt="Pikepdf Thumbnail">
+                </div>
+                <div class="res-data">
+                  <div class="res-stat">
+                    <div class="res-lbl">SUMBER FILE</div>
+                    <div class="res-val" style="font-size:14px;" id="src5">-</div>
+                  </div>
+                  <div class="res-stat">
+                    <div class="res-lbl">UKURAN FINAL</div>
+                    <div class="res-val" id="sz5" style="color:var(--green);font-size:24px;">-</div>
+                  </div>
+                  <div class="res-stat">
+                    <div class="res-lbl">PENGHEMATAN</div>
+                    <div class="res-val" id="sav5" style="color:var(--green);">-</div>
+                  </div>
+                  <div class="res-stat">
+                    <div class="res-lbl">WAKTU PROSES</div>
+                    <div class="res-val" style="font-size:14px;" id="tm5">-</div>
+                  </div>
+                  <div id="pikeChecklist"
+                    style="display:none;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);line-height:1.8;">
+                    <div id="pikeStep1">⏳ ObjStm Packing...</div>
+                    <div id="pikeStep2" style="opacity:0.3;">⏳ Garbage Collection...</div>
+                  </div>
+                </div>
+              </div>
+              <div class="comp-wrapper">
+                <div
+                  style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:bold;">
+                  KOMPARASI & DAMPAK PER PROSES</div>
+
+                <div class="comp-row">
+                  <div class="comp-label">1. ORIGINAL</div>
+                  <div class="comp-track">
+                    <div class="comp-fill" id="barOrig" style="background:var(--text);"></div>
+                  </div>
+                  <div class="comp-val" id="valOrig">-</div>
+                </div>
+
+                <div class="comp-row">
+                  <div class="comp-label">2. GHOSTSCRIPT</div>
+                  <div class="comp-track">
+                    <div class="comp-fill" id="barGs" style="background:#e06c2b;"></div>
+                  </div>
+                  <div class="comp-val" id="valGs">-</div>
+                </div>
+                <div class="comp-delta" style="text-align:right; margin-top:-8px; margin-bottom:8px; color:#e06c2b;"
+                  id="deltaGs">Dampak Visual: -</div>
+
+                <div class="comp-row">
+                  <div class="comp-label">3. PIKEPDF</div>
+                  <div class="comp-track">
+                    <div class="comp-fill" id="barPike" style="background:var(--green);"></div>
+                  </div>
+                  <div class="comp-val" id="valPike">-</div>
+                </div>
+                <div class="comp-delta"
+                  style="text-align:right; margin-top:-8px; margin-bottom:8px; color:var(--green);" id="deltaPike">
+                  Dampak Struktural: -</div>
+
+              </div>
+              <div id="anat5" style="width:100%; margin-top:16px;"></div>
+            </div>
+          </div>
+
+          <div class="step-right">
+            <div class="step-hdr">
+              <div class="step-num">5</div>
+              <div class="step-title">Pikepdf Optimize</div>
+              <div class="step-status" id="s5-status">Locked</div>
+            </div>
+
+            <div class="tuning-group" style="grid-template-columns:1fr;">
+              <div class="tuning-item" style="flex-direction:row;align-items:center;gap:8px;">
+                <input type="checkbox" id="tune_pike_opt" style="width:auto;transform:scale(1.2);" checked>
+                <label style="font-size:13px;cursor:pointer;" for="tune_pike_opt">Enable Object Stream Packing</label>
+              </div>
+            </div>
+
+            <button class="btn " id="btn5" onclick="runPike()">
+              <span class="loader"></span> <span>Run Pikepdf</span>
+            </button>
+
+            <div class="edu-box">
+              <h5>Tujuan Ilmiah</h5>
+              <p>Melakukan kompresi <b>struktural murni</b>. Menghapus metadata usang, jejak revisi (*orphaned
+                objects*), dan menyatukan tabel (*object stream packing*) <b>tanpa</b> menyentuh visual sedikitpun.</p>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- End Step Wrapper -->
+    </div> <!-- End Zona 2 -->
+
+    <!-- ZONA 3 -->
+    <div class="zone-container">
+      <div class="zone-header">
+        <div>
+          <div class="zone-title">Keputusan Fallback dan Pengecekan Nilai SSIM dan PSNR</div>
+          <div class="zone-desc">Fase jaminan mutu: validasi tidak ada pembengkakan ukuran dan keutuhan data tetap
+            terjaga.</div>
+        </div>
+      </div>
+      <div class="step-wrapper">
+
+        <!-- STEP 6: FALLBACK CHECK -->
+        <div class="step-card" id="step6">
+          <div class="step-left">
+            <div class="visual-res" id="res6" style="display:none;flex-direction:column;">
+              <div id="safetyCheckBox"
+                style="padding:16px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;border:1px solid var(--border);">
+                <div style="font-weight:bold;margin-bottom:4px;">Safety Check (Keamanan Monotonik)</div>
+                <div id="safetyLog" style="color:var(--text2);">Membandingkan ukuran hasil pemrosesan dengan file
+                  asli...</div>
+                <div id="safetyStatus" style="font-weight:bold;margin-top:4px;">-</div>
+              </div>
+              <div style="margin-top:24px;">
+                <a href="#" id="dlBtn" class="btn"
+                  style="background:var(--green-bg);color:var(--green);border:1px solid var(--green);display:none;width:auto;padding:12px 32px;">Unduh
+                  PDF Terkompresi</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-right">
+            <div class="step-hdr">
+              <div class="step-num">6</div>
+              <div class="step-title">Monotonic Fallback</div>
+              <div class="step-status" id="s6-status">Locked</div>
+            </div>
+
+            <button class="btn" id="btn6" onclick="runFallback()">
+              <span class="loader"></span> <span>Run Safety Check</span>
+            </button>
+
+            <div class="edu-box">
+              <h5>Tujuan Ilmiah</h5>
+              <p>Validasi hasil akhir. Algoritma akan menahan proses jika ukuran file justru membengkak pasca-kompresi,
+                secara otomatis melakukan fallback ke dokumen asli (Monotonic Size Protection).</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 7: EVALUATION -->
+        <div class="step-card" id="step7">
+          <div class="step-left">
+            <div class="visual-res" id="res7" style="display:none;flex-direction:column;justify-content:center;">
+
+              <div class="metrics-grid" style="grid-template-columns:1fr 1fr;gap:24px;">
+                <div>
+                  <h4
+                    style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--accent);margin-bottom:12px;">
+                    METRIK DISTORSI (KUALITAS)</h4>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
+                    <div style="display:flex;flex-direction:column;align-items:center;">
+                      <div style="width:100px; height:75px;"><canvas id="ssimChart"></canvas></div>
+                      <div
+                        style="font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--text2); margin-top:-8px; font-weight:bold;">
+                        SSIM SCORE</div>
+                      <div id="evalSsimVal"
+                        style="font-size:18px; font-weight:700; font-family:'JetBrains Mono',monospace;">-</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;">
+                      <div style="width:100px; height:75px;"><canvas id="textEvalChart"></canvas></div>
+                      <div
+                        style="font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--text2); margin-top:-8px; font-weight:bold;">
+                        TEXT INTEGRITY</div>
+                      <div id="evalTextVal"
+                        style="font-size:18px; font-weight:700; font-family:'JetBrains Mono',monospace;">-</div>
+                    </div>
+                  </div>
+                  <div
+                    style="background:var(--surface2);padding:8px 12px;border-radius:6px;font-family:monospace;font-size:12px;display:flex;justify-content:space-between;">
+                    <span>ESTIMASI PSNR:</span><strong id="evalPsnr">-</strong>
+                  </div>
+                  <div
+                    style="background:var(--surface2);padding:8px 12px;border-radius:6px;font-family:monospace;font-size:12px;display:flex;justify-content:space-between;margin-top:8px;">
+                    <span>HALAMAN:</span><strong id="evalPages">-</strong>
+                  </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                  <div
+                    style="background:var(--surface2);padding:16px;border-radius:8px;border-left:4px solid var(--green);">
+                    <h4
+                      style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--green);margin-bottom:8px;">
+                      METRIK RATE (UKURAN)</h4>
+                    <div
+                      style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:4px;font-family:monospace;font-size:12px;">
+                      <span>Ukuran Akhir:</span><strong id="evalFinalSize">-</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-family:monospace;font-size:12px;">
+                      <span>Space Saving:</span><strong id="evalSaving" style="color:var(--green);">-</strong>
+                    </div>
+                  </div>
+                  <div style="background:var(--surface2);padding:16px;border-radius:8px;border-left:4px solid #e06c2b;">
+                    <h4 style="font-size:11px;font-family:'JetBrains Mono',monospace;color:#e06c2b;margin-bottom:8px;">
+                      METRIK PERFORMA</h4>
+                    <div
+                      style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:4px;font-family:monospace;font-size:12px;">
+                      <span>Total Waktu:</span><strong id="evalTimeVal">-</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-family:monospace;font-size:12px;">
+                      <span>Throughput:</span><strong id="evalThroughput">-</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style="margin-top:32px; display:none; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:24px;"
+                id="ablationSection">
+                <h4 style="margin:0 0 16px 0; color:var(--text); font-size:16px;">Log Timeline & Bukti Ilmiah (Ablation
+                  Data)</h4>
+
+                <div style="display:flex; justify-content:space-between; margin-bottom:20px; gap:16px;">
+                  <div
+                    style="flex:1; text-align:center; padding:16px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+                    <div
+                      style="font-size:11px; color:var(--text2); font-weight:700; letter-spacing:1px; text-transform:uppercase;">
+                      Penghematan Font</div>
+                    <div style="font-size:24px; font-weight:800; color:var(--green); margin-top:8px;" id="fontSavings">-
+                      MB</div>
+                  </div>
+                  <div
+                    style="flex:1; text-align:center; padding:16px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+                    <div
+                      style="font-size:11px; color:var(--text2); font-weight:700; letter-spacing:1px; text-transform:uppercase;">
+                      Penghematan Gambar</div>
+                    <div style="font-size:24px; font-weight:800; color:var(--accent); margin-top:8px;" id="imgSavings">-
+                      MB</div>
+                  </div>
+                </div>
+
+                <div
+                  style="background:var(--surface2); padding:16px; border-radius:6px; font-size:13px; line-height:1.6; border-left:4px solid var(--accent); margin-bottom:20px;">
+                  <strong>Mekanisme Subsetting:</strong><br>
+                  Sistem mendeteksi <span id="fontBefore" style="font-weight:700; color:var(--accent);">-</span> menjadi
+                  <span id="fontAfter" style="font-weight:700; color:var(--green);">-</span>.
+                </div>
+
+                <div id="timelineTableContainer" style="overflow-x:auto;"></div>
+              </div>
+
+              <div id="visualCompareSection"
+                style="margin-top:24px; display:none; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:24px;">
+                <h4 style="margin:0 0 16px 0; color:var(--text); font-size:16px;">Komparasi Visual (Before / After)</h4>
+                <div style="display:flex; justify-content:space-between; gap:24px;">
+                  <div style="flex:1; text-align:center;">
+                    <div
+                      style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--text2); margin-bottom:12px; font-weight:700; letter-spacing:1px;">
+                      SEBELUM KOMPRESI</div>
+                    <img id="thumbBefore" class="thumb-img" src="" alt="Before"
+                      style="max-height:400px; width:auto; border-radius:4px; border:1px solid var(--border);">
+                  </div>
+                  <div style="flex:1; text-align:center;">
+                    <div
+                      style="font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--accent); margin-bottom:12px; font-weight:700; letter-spacing:1px;">
+                      SESUDAH KOMPRESI</div>
+                    <img id="thumbAfter" class="thumb-img" src="" alt="After"
+                      style="max-height:400px; width:auto; border-radius:4px; border:1px solid var(--border);">
+                  </div>
+                </div>
+                <div style="font-size:12px; color:var(--text3); font-style:italic; text-align:center; margin-top:16px;">
+                  Arahkan kursor ke gambar untuk memperbesar (Zoom on Hover).
+                </div>
+              </div>
+
+              <div style="margin-top:24px;">
+                <a href="#" id="exportBtn" class="btn"
+                  style="background:var(--accent);color:#fff;display:none;width:auto;padding:12px 32px;"
+                  onclick="exportLog(event)">Export Log Analisis (Excel)</a>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="step-right">
+            <div class="step-hdr">
+              <div class="step-num">7</div>
+              <div class="step-title">Validasi Kualitas</div>
+              <div class="step-status" id="s7-status">Locked</div>
+            </div>
+
+            <div class="tuning-group">
+              <div class="tuning-item">
+                <label>Max Pages to Sample</label>
+                <input type="number" id="tune_eval_pages" value="10">
+              </div>
+              <div class="tuning-item">
+                <label>Render DPI</label>
+                <input type="number" id="tune_eval_dpi" value="100">
+              </div>
+            </div>
+
+            <button class="btn" id="btn7" onclick="runEvaluate()">
+              <span class="loader"></span> <span>Jalankan Validasi</span>
+            </button>
+
+            <div class="edu-box">
+              <h5>Tujuan Ilmiah</h5>
+              <p>Menghitung metrik SSIM secara matematis untuk menjamin tidak ada degradasi piksel yang signifikan, dan
+                menguji urutan teks untuk memastikan tidak ada karakter yang hilang akibat kompresi.</p>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- End Step Wrapper -->
+    </div> <!-- End Zona 3 -->
+
+  </div>
+
+  <script>
+    let token = null;
+    let origSize = 0;
+    let gsSize = 0;
+    let pikeSize = 0;
+    let limitChart = null;
+    let areaChart = null;
+    let confChart = null;
+    let gsChartObj = null;
+    let sizeChart = null;
+    let ssimChart = null;
+    let textEvalChart = null;
+
+    function toggleTheme() {
+      const isD = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.documentElement.setAttribute('data-theme', isD ? 'light' : 'dark');
+    }
+
+    function unlockStep(num) {
+      const el = document.getElementById('step' + num);
+      if (el) {
+        el.classList.add('active');
+        document.getElementById('s' + num + '-status').textContent = 'Ready';
+      }
+    }
+    function completeStep(num) {
+      const step = document.getElementById('step' + num);
+      if (step) step.classList.add('done');
+      const status = document.getElementById('s' + num + '-status');
+      if (status) status.textContent = 'Done';
+      const res = document.getElementById('res' + num);
+      if (res) {
+        res.style.display = 'flex';
+        setTimeout(() => res.classList.add('visible'), 50); // fade in
+      }
+      const btn = document.getElementById('btn' + num);
+      if (btn) btn.style.display = 'none';
+
+      if (num < 7) unlockStep(num + 1);
+    }
+    function loadingBtn(num, state) {
+      const b = document.getElementById('btn' + num);
+      b.disabled = state;
+      if (state) b.classList.add('loading');
+      else b.classList.remove('loading');
+    }
+
+    // 1. Upload
+    document.getElementById('fileIn').addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      document.getElementById('dz').style.display = 'none';
+      const fd = new FormData(); fd.append('pdf', f);
+
+      fetch('/visual/upload', { method: 'POST', body: fd })
+        .then(r => r.json()).then(d => {
+          token = d.token;
+          origSize = d.size_bytes;
+          document.getElementById('fn1').textContent = d.filename;
+          document.getElementById('sz1').textContent = d.size_formatted;
+          document.getElementById('pg1').textContent = d.pages;
+          if (d.thumbnail) document.getElementById('thumb1').src = d.thumbnail;
+
+          if (d.anatomy) renderAnatomyTable('anat1', d.anatomy, 'Anatomi File Asli');
+
+          completeStep(1);
+
+          // Render Step 1 Chart
+          setTimeout(() => {
+            const ctx1 = document.getElementById('sizeLimitChart').getContext('2d');
+            if (limitChart) limitChart.destroy();
+            const maxB = 200 * 1024 * 1024;
+            const used = Math.min(origSize, maxB);
+            const rem = Math.max(0, maxB - used);
+            limitChart = new Chart(ctx1, {
+              type: 'doughnut',
+              data: {
+                labels: ['Ukuran', 'Sisa'],
+                datasets: [{ data: [used, rem], backgroundColor: ['#2d5cf6', '#e0e0e0'], borderWidth: 0 }]
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false,
+                rotation: 270, circumference: 180,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+              }
+            });
+          }, 100);
+
+        }).catch(e => {
+          alert("Gagal mengunggah: " + e.message);
+        });
+    });
+
+    // 2. Extract
+    function runExtract() {
+      if (!token) return;
+      loadingBtn(2, true);
+      fetch('/visual/extract/' + token, { method: 'POST' })
+        .then(r => r.json()).then(d => {
+          loadingBtn(2, false);
+          if (d.error) return alert("Error Backend: " + d.error);
+
+          document.getElementById('textRat').textContent = (d.avg_text_area_ratio * 100).toFixed(1) + '%';
+          document.getElementById('textFill').style.width = (d.avg_text_area_ratio * 100) + '%';
+          document.getElementById('imgRat').textContent = (d.avg_image_area_ratio * 100).toFixed(1) + '%';
+          document.getElementById('imgFill').style.width = (d.avg_image_area_ratio * 100) + '%';
+          document.getElementById('bilRat').textContent = (d.bilevel_image_ratio * 100).toFixed(1) + '%';
+          document.getElementById('bilFill').style.width = (d.bilevel_image_ratio * 100) + '%';
+
+          document.getElementById('ctext').textContent = d.total_text_len + ' karakter';
+          document.getElementById('images').textContent = d.total_images;
+          document.getElementById('enc').textContent = d.dominant_image_encoding;
+
+          completeStep(2);
+
+          // Render Chart.js Doughnut (Render after display:flex to ensure canvas size is computed)
+          setTimeout(() => {
+            const textPct = d.avg_text_area_ratio * 100;
+            const imgPct = d.avg_image_area_ratio * 100;
+            const emptyPct = Math.max(0, 100 - (textPct + imgPct));
+
+            const ctxArea = document.getElementById('areaChart').getContext('2d');
+            if (areaChart) areaChart.destroy();
+            areaChart = new Chart(ctxArea, {
+              type: 'doughnut',
+              data: {
+                labels: ['Area Teks', 'Area Gambar', 'Area Kosong'],
+                datasets: [{
+                  data: [textPct, imgPct, emptyPct],
+                  backgroundColor: ['#2d5cf6', '#e06c2b', '#d8d6cc'],
+                  borderWidth: 1,
+                  borderColor: getComputedStyle(document.documentElement).getPropertyValue('--surface')
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { position: 'bottom', labels: { font: { family: "'Syne', sans-serif" } } }
+                }
+              }
+            });
+          }, 100);
+
+        }).catch(e => {
+          loadingBtn(2, false);
+          alert("Terjadi kesalahan saat menghubungi server: " + e.message);
+        });
+    }
+
+    // 3. Classify
+    function runClassify() {
+      if (!token) return;
+      loadingBtn(3, true);
+
+      fetch('/visual/classify/' + token, { method: 'POST' })
+        .then(r => r.json()).then(d => {
+          loadingBtn(3, false);
+          if (d.error) return alert("Error Backend: " + d.error);
+
+          const badge = document.getElementById('clsBadge');
+          badge.textContent = d.class;
+          badge.className = 'cls-badge cls-' + d.class;
+          document.getElementById('clsConf').textContent = `(${d.confidence})`;
+          document.getElementById('clsReason').textContent = d.reason;
+
+          completeStep(3);
+
+          // Render Step 3 Chart
+          setTimeout(() => {
+            const ctx3 = document.getElementById('confChart').getContext('2d');
+            if (confChart) confChart.destroy();
+            const confVal = parseFloat(d.confidence) || 0;
+            const rem = Math.max(0, 100 - confVal);
+            confChart = new Chart(ctx3, {
+              type: 'doughnut',
+              data: {
+                labels: ['Confidence', 'Uncertainty'],
+                datasets: [{ data: [confVal, rem], backgroundColor: ['#3b6d11', '#e0e0e0'], borderWidth: 0 }]
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false,
+                rotation: 270, circumference: 180,
+                plugins: { legend: { display: false } }
+              }
+            });
+          }, 100);
+
+        }).catch(e => {
+          loadingBtn(3, false);
+          alert("Terjadi kesalahan saat klasifikasi: " + e.message);
+        });
+    }
+
+    // 4. Ghostscript
+    function runGS() {
+      if (!token) return;
+      loadingBtn(4, true);
+
+      document.getElementById('gsChecklist').style.display = 'block';
+      document.getElementById('gsStep1').innerHTML = '⏳ Executing Discrete Cosine Transform (DCT)...';
+      document.getElementById('gsStep1').style.opacity = '1';
+      document.getElementById('gsStep2').innerHTML = '⏳ Executing MD5 Pattern Matching...';
+      document.getElementById('gsStep2').style.opacity = '0.3';
+      document.getElementById('gsStep3').innerHTML = '⏳ Executing Font Subsetting...';
+      document.getElementById('gsStep3').style.opacity = '0.3';
+
+      const fd = new FormData();
+      const preset = document.getElementById('tune_gs_preset').value;
+      if (preset) fd.append('pdf_setting', preset);
+
+      const cdpi = document.getElementById('tune_color_dpi').value;
+      if (cdpi) fd.append('color_dpi', cdpi);
+      const gdpi = document.getElementById('tune_gray_dpi').value;
+      if (gdpi) fd.append('gray_dpi', gdpi);
+      const mdpi = document.getElementById('tune_mono_dpi').value;
+      if (mdpi) fd.append('mono_dpi', mdpi);
+      const jq = document.getElementById('tune_jpeg').value;
+      if (jq) fd.append('jpeg_quality', jq);
+
+      fd.append('grayscale', document.getElementById('tune_gray').checked);
+
+      fetch('/visual/gs/' + token, { method: 'POST', body: fd })
+        .then(r => r.json()).then(d => {
+          loadingBtn(4, false);
+          if (d.error) return alert("Error Backend: " + d.error);
+
+          gsSize = d.size_bytes;
+          document.getElementById('sz4').textContent = d.size_formatted;
+          document.getElementById('tm4').textContent = d.time_ms + ' ms';
+          document.getElementById('gsCmdText').textContent = d.params_used;
+          if (d.thumbnail) document.getElementById('thumb4').src = d.thumbnail;
+
+          if (d.larger_than_orig) {
+            document.getElementById('gsWarn').style.display = 'block';
+            document.getElementById('sz4').style.color = 'var(--red)';
+          } else {
+            document.getElementById('gsWarn').style.display = 'none';
+            document.getElementById('sz4').style.color = 'var(--text)';
+          }
+
+          if (d.anatomy) renderAnatomyTable('anat4', d.anatomy, 'Anatomi Output Ghostscript');
+
+          completeStep(4);
+
+          setTimeout(() => { document.getElementById('gsStep1').innerHTML = '✅ Executing Discrete Cosine Transform (DCT)...'; }, 300);
+          setTimeout(() => { document.getElementById('gsStep2').style.opacity = '1'; }, 600);
+          setTimeout(() => { document.getElementById('gsStep2').innerHTML = '✅ Executing MD5 Pattern Matching...'; }, 900);
+          setTimeout(() => { document.getElementById('gsStep3').style.opacity = '1'; }, 1200);
+          setTimeout(() => { document.getElementById('gsStep3').innerHTML = '✅ Executing Font Subsetting...'; }, 1500);
+
+          // Render Step 4 Chart
+          setTimeout(() => {
+            const ctx4 = document.getElementById('gsChart').getContext('2d');
+            if (gsChartObj) gsChartObj.destroy();
+            gsChartObj = new Chart(ctx4, {
+              type: 'bar',
+              data: {
+                labels: ['Asli', 'GS'],
+                datasets: [{
+                  label: 'MB',
+                  data: [origSize / 1048576, gsSize / 1048576],
+                  backgroundColor: ['#d8d6cc', '#2d5cf6'],
+                  borderRadius: 4
+                }]
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                scales: { x: { beginAtZero: true } },
+                plugins: { legend: { display: false } }
+              }
+            });
+          }, 100);
+
+        }).catch(e => {
+          loadingBtn(4, false);
+          alert("Terjadi kesalahan saat Ghostscript: " + e.message);
+        });
+    }
+
+    // 5. Pikepdf
+    function runPike() {
+      if (!token) return;
+      loadingBtn(5, true);
+
+      document.getElementById('pikeChecklist').style.display = 'block';
+      document.getElementById('pikeStep1').innerHTML = '⏳ ObjStm Packing...';
+      document.getElementById('pikeStep1').style.opacity = '1';
+      document.getElementById('pikeStep2').innerHTML = '⏳ Garbage Collection...';
+      document.getElementById('pikeStep2').style.opacity = '0.3';
+
+      // Note: visual_pike doesn't actually take parameters yet, but we could if we modified backend
+      fetch('/visual/pike/' + token, { method: 'POST' })
+        .then(r => r.json()).then(d => {
+          loadingBtn(5, false);
+          if (d.error) return alert("Error Backend: " + d.error);
+
+          document.getElementById('sz5').textContent = d.size_formatted;
+          document.getElementById('tm5').textContent = d.time_ms + ' ms';
+          document.getElementById('src5').textContent = d.source_used;
+          if (d.thumbnail) document.getElementById('thumb5').src = d.thumbnail;
+
+          const sav = ((1 - (d.size_bytes / origSize)) * 100).toFixed(1);
+          document.getElementById('sav5').textContent = sav > 0 ? sav + '%' : '0%';
+
+          pikeSize = d.size_bytes;
+          if (d.anatomy) renderAnatomyTable('anat5', d.anatomy, 'Anatomi Output Final (Pikepdf)');
+          
+          completeStep(5);
+
+          setTimeout(() => { document.getElementById('pikeStep1').innerHTML = '✅ ObjStm Packing...'; }, 300);
+          setTimeout(() => { document.getElementById('pikeStep2').style.opacity = '1'; }, 600);
+          setTimeout(() => { document.getElementById('pikeStep2').innerHTML = '✅ Garbage Collection...'; }, 900);
+
+          // Update Horizontal Size Bars
+          setTimeout(() => {
+            const pOrig = 100;
+            const pGs = Math.min(100, (gsSize / origSize) * 100);
+            const pPike = Math.min(100, (d.size_bytes / origSize) * 100);
+
+            document.getElementById('barOrig').style.width = pOrig + '%';
+            document.getElementById('barGs').style.width = pGs + '%';
+            document.getElementById('barPike').style.width = pPike + '%';
+
+            document.getElementById('valOrig').textContent = (origSize / 1048576).toFixed(2) + ' MB';
+            document.getElementById('valGs').textContent = (gsSize / 1048576).toFixed(2) + ' MB';
+            document.getElementById('valPike').textContent = (d.size_bytes / 1048576).toFixed(2) + ' MB';
+
+            const deltaGsMB = Math.max(0, (origSize - gsSize) / 1048576).toFixed(2);
+            const deltaGsPct = Math.max(0, ((origSize - gsSize) / origSize) * 100).toFixed(1);
+            document.getElementById('deltaGs').textContent = `Dampak Visual: Menghemat ${deltaGsMB} MB (${deltaGsPct}%)`;
+
+            const deltaPikeMB = Math.max(0, (gsSize - d.size_bytes) / 1048576).toFixed(2);
+            let deltaPikePct = 0;
+            if (origSize > 0) deltaPikePct = Math.max(0, ((gsSize - d.size_bytes) / origSize) * 100).toFixed(1);
+            document.getElementById('deltaPike').textContent = `Dampak Struktural: Menghemat ${deltaPikeMB} MB (${deltaPikePct}%)`;
+
+          }, 100);
+
+        }).catch(e => {
+          loadingBtn(5, false);
+          alert("Terjadi kesalahan saat Pikepdf: " + e.message);
+        });
+    }
+
+    // 6. Fallback Check
+    function runFallback() {
+      if (!token) return;
+      loadingBtn(6, true);
+
+      setTimeout(() => {
+        loadingBtn(6, false);
+        if (pikeSize < origSize) {
+          document.getElementById('safetyStatus').textContent = "✅ Lolos Uji Keamanan: Ukuran kompresi lebih kecil.";
+          document.getElementById('safetyStatus').style.color = "var(--green)";
+          document.getElementById('safetyCheckBox').style.borderColor = "var(--green)";
+          document.getElementById('safetyCheckBox').style.backgroundColor = "var(--green-bg)";
+        } else {
+          document.getElementById('safetyStatus').textContent = "❌ Dibatalkan (Discarded): File membengkak, mengembalikan ke file original.";
+          document.getElementById('safetyStatus').style.color = "var(--red)";
+          document.getElementById('safetyCheckBox').style.borderColor = "var(--red)";
+          document.getElementById('safetyCheckBox').style.backgroundColor = "var(--red-bg)";
+        }
+        const dlBtn = document.getElementById('dlBtn');
+        dlBtn.href = '/visual/download/' + token;
+        dlBtn.style.display = 'inline-flex';
+        completeStep(6);
+      }, 600);
+    }
+
+    // 7. Evaluate
+    function runEvaluate() {
+      if (!token) return;
+      loadingBtn(7, true);
+
+      const fd = new FormData();
+      fd.append('max_pages', document.getElementById('tune_eval_pages').value || 10);
+      fd.append('eval_dpi', document.getElementById('tune_eval_dpi').value || 100);
+
+      fetch('/visual/evaluate/' + token, { method: 'POST', body: fd })
+        .then(r => r.json()).then(d => {
+          loadingBtn(7, false);
+          if (d.error) return alert("Error Backend: " + d.error);
+
+          document.getElementById('evalSsimVal').textContent = d.ssim_avg !== null ? d.ssim_avg.toFixed(4) : "N/A";
+
+          let tr = d.text_sequence_ratio;
+          if (tr === null) {
+            document.getElementById('evalTextVal').textContent = "N/A (Scan)";
+            tr = 0; // for chart rendering fallback
+          } else {
+            document.getElementById('evalTextVal').textContent = (tr * 100).toFixed(2) + "%";
+          }
+
+          document.getElementById('evalPsnr').textContent = d.psnr_avg !== null ? d.psnr_avg.toFixed(2) + " dB" : "N/A";
+          document.getElementById('evalPages').textContent = d.pages_match ? "OK (" + d.pages_compressed + ")" : "MISMATCH (" + d.pages_original + " != " + d.pages_compressed + ")";
+          document.getElementById('evalPages').style.color = d.pages_match ? "var(--green)" : "var(--red)";
+
+          if (d.timeline && d.timeline.length > 0) {
+            const finalRow = d.timeline[d.timeline.length - 1];
+            const origRow = d.timeline[0];
+            document.getElementById('evalFinalSize').textContent = finalRow.size_mb + ' MB';
+            const saving = ((1 - (finalRow.size_mb / origRow.size_mb)) * 100).toFixed(1);
+            document.getElementById('evalSaving').textContent = saving + '%';
+            document.getElementById('evalTimeVal').textContent = d.time_ms + ' ms';
+            const throughput = (origRow.size_mb / (d.time_ms / 1000)).toFixed(2);
+            document.getElementById('evalThroughput').textContent = isFinite(throughput) ? throughput + ' MB/s' : '-';
+          }
+
+          completeStep(7);
+
+          // Show Visual Compare
+          const thumb1Src = document.getElementById('thumb1').src;
+          const thumb4Src = document.getElementById('thumb4').src;
+          const thumb5Src = document.getElementById('thumb5').src;
+
+          if (thumb1Src) {
+            document.getElementById('visualCompareSection').style.display = 'block';
+            document.getElementById('thumbBefore').src = thumb1Src;
+            // Use thumb5 if available, fallback to thumb4 (GS only)
+            document.getElementById('thumbAfter').src = thumb5Src ? thumb5Src : thumb4Src;
+          }
+
+          // Render Gauges
+          setTimeout(() => {
+            // SSIM Gauge
+            const ctxSsim = document.getElementById('ssimChart').getContext('2d');
+            if (ssimChart) ssimChart.destroy();
+
+            let ssimVal = d.ssim_avg !== null ? d.ssim_avg : 0;
+            let ssimColor = ssimVal > 0.95 ? '#3b6d11' : (ssimVal > 0.90 ? '#e06c2b' : '#a32d2d');
+
+            ssimChart = new Chart(ctxSsim, {
+              type: 'doughnut',
+              data: {
+                labels: ['SSIM', 'Loss'],
+                datasets: [{ data: [ssimVal, Math.max(0, 1 - ssimVal)], backgroundColor: [ssimColor, '#e0e0e0'], borderWidth: 0 }]
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false,
+                rotation: 270, circumference: 180,
+                plugins: { legend: { display: false } }
+              }
+            });
+
+            // Text Gauge
+            const ctxText = document.getElementById('textEvalChart').getContext('2d');
+            if (textEvalChart) textEvalChart.destroy();
+
+            let textVal = d.text_sequence_ratio !== null ? d.text_sequence_ratio : 0;
+            let textColor = textVal > 0.99 ? '#3b6d11' : (textVal > 0.95 ? '#e06c2b' : '#a32d2d');
+            if (d.text_sequence_ratio === null) textColor = '#e0e0e0'; // Gray out if N/A
+
+            textEvalChart = new Chart(ctxText, {
+              type: 'doughnut',
+              data: {
+                labels: ['Integrity', 'Loss'],
+                datasets: [{ data: [textVal, Math.max(0, 1 - textVal)], backgroundColor: [textColor, '#e0e0e0'], borderWidth: 0 }]
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false,
+                rotation: 270, circumference: 180,
+                plugins: { legend: { display: false } }
+              }
+            });
+          }, 100);
+
+          // Render Ablation Data
+          if (d.anatomy) {
+            document.getElementById('ablationSection').style.display = 'block';
+
+            let f_saved = Math.max(0, d.anatomy.orig_font_mb - d.anatomy.final_font_mb);
+            let i_saved = Math.max(0, d.anatomy.orig_img_mb - d.anatomy.final_img_mb);
+
+            document.getElementById('fontSavings').textContent = f_saved.toFixed(2) + " MB";
+            document.getElementById('imgSavings').textContent = i_saved.toFixed(2) + " MB";
+
+            document.getElementById('fontBefore').textContent = `${d.anatomy.orig_full_fonts} font utuh dan ${d.anatomy.orig_sub_fonts} font subset`;
+            document.getElementById('fontAfter').textContent = `${d.anatomy.final_sub_fonts} font subset baru`;
+          }
+
+          // Render Timeline Table
+          if (d.timeline && d.timeline.length > 0) {
+            let tableHTML = `
+            <table class="timeline-table">
+                <thead>
+                    <tr>
+                        <th>Tahap</th>
+                        <th>Ukuran Total</th>
+                        <th>Font (MB)</th>
+                        <th>Font Utuh</th>
+                        <th>Font Subset</th>
+                        <th>Gambar (MB)</th>
+                        <th>Lainnya (MB)</th>
+                        <th>Daftar Font (Max 5)</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+            d.timeline.forEach(row => {
+              let f_list = row.font_list || [];
+              let fontNames = f_list.map(f => f.name);
+              let fontStr = fontNames.slice(0, 5).join(", ");
+              if (fontNames.length > 5) fontStr += ` ... (+${fontNames.length - 5} lainnya)`;
+
+              tableHTML += `
+                <tr>
+                    <td><strong>${row.step}</strong></td>
+                    <td style="color:var(--accent); font-weight:bold;">${row.size_mb} MB</td>
+                    <td>${row.font_mb}</td>
+                    <td>${row.full_fonts}</td>
+                    <td>${row.sub_fonts}</td>
+                    <td>${row.img_mb}</td>
+                    <td>${row.other_mb}</td>
+                    <td style="color:var(--text3); font-size:10px;">${fontStr}</td>
+                </tr>
+            `;
+            });
+            tableHTML += `</tbody></table>`;
+            document.getElementById('timelineTableContainer').innerHTML = tableHTML;
+          }
+
+          document.getElementById('exportBtn').style.display = 'inline-flex';
+
+        }).catch(e => {
+          loadingBtn(7, false);
+          alert("Terjadi kesalahan saat Evaluasi: " + e.message);
+        });
+    }
+
+    function exportLog(e) {
+      e.preventDefault();
+      if (!token) return;
+      window.location.href = '/visual/export_log/' + token;
+    }
+
+    function renderAnatomyTable(containerId, data, title) {
+      let fontBadges = "";
+      if (data.font_list && data.font_list.length > 0) {
+        fontBadges = data.font_list.map(f => {
+          if (f.is_subset) {
+            return `<span style="display:inline-block; margin:2px; padding:2px 6px; background:var(--green-bg); color:var(--green); border-radius:4px; font-size:9px;">${f.name} (Subset)</span>`;
+          } else {
+            return `<span style="display:inline-block; margin:2px; padding:2px 6px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:9px;">${f.name} (Utuh)</span>`;
+          }
+        }).join("");
+      } else {
+        fontBadges = `<span style="color:var(--text3); font-size:10px;">Tidak ada teks/font</span>`;
+      }
+
+      let html = `
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+          <div style="padding:10px 14px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:11px; font-weight:bold; color:var(--text2); text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:8px;">
+              <span>${title}</span>
+          </div>
+          <div style="overflow-x:auto;">
+              <table class="timeline-table" style="margin-top:0; border:none; border-radius:0;">
+                  <thead>
+                      <tr>
+                          <th>Ukuran Total</th>
+                          <th>Font (MB)</th>
+                          <th>Font Utuh</th>
+                          <th>Font Subset</th>
+                          <th>Gambar (MB)</th>
+                          <th>Lainnya (MB)</th>
+                          <th style="min-width:200px;">Daftar Detail Font</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td style="font-weight:bold; color:var(--accent); font-size:14px;">${data.size_mb.toFixed(3)} MB</td>
+                          <td>${data.font_mb.toFixed(3)}</td>
+                          <td><span style="font-weight:bold;">${data.full_fonts}</span></td>
+                          <td><span style="font-weight:bold; color:var(--green);">${data.sub_fonts}</span></td>
+                          <td>${data.img_mb.toFixed(3)}</td>
+                          <td>${data.other_mb.toFixed(3)}</td>
+                          <td style="max-width:350px; white-space:normal; line-height:1.6; max-height:80px; overflow-y:auto; display:block;">
+                            ${fontBadges}
+                          </td>
+                      </tr>
+                  </tbody>
+              </table>
+          </div>
+      </div>
+      `;
+      document.getElementById(containerId).innerHTML = html;
+    }
+  </script>
+</body>
+
+</html>

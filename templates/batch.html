@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Compression Research — Batch Mode</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+<style>
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f4f0;--surface:#fff;--surface2:#f0efe9;
+  --border:#d8d6cc;--border2:#c4c2b6;
+  --text:#1a1916;--text2:#6b6960;--text3:#9e9d97;
+  --green-bg:#eaf3de;--green-txt:#3b6d11;
+  --blue-bg:#e6f1fb;--blue-txt:#185fa5;
+  --amber-bg:#faeeda;--amber-txt:#854f0b;
+  --purple-bg:#eeedfe;--purple-txt:#534ab7;
+  --red-bg:#fcebeb;--red-txt:#a32d2d;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;
+}
+[data-theme="dark"]{
+  --bg:#141412;--surface:#1e1d1a;--surface2:#252420;
+  --border:#333230;--border2:#444240;
+  --text:#f0ede8;--text2:#9a9890;--text3:#5e5d57;
+  --green-bg:#173404;--green-txt:#c0dd97;
+  --blue-bg:#042c53;--blue-txt:#b5d4f4;
+  --amber-bg:#412402;--amber-txt:#fac775;
+  --purple-bg:#26215c;--purple-txt:#cecbf6;
+  --red-bg:#501313;--red-txt:#f7c1c1;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:15px;line-height:1.5;transition:background .2s,color .2s}
+.layout{display:flex;flex-direction:column;min-height:100vh;max-width:1280px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:12px;padding:0 20px;height:52px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.logo{width:30px;height:30px;border:1.5px solid var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo svg{width:14px;height:14px;stroke:var(--text)}
+.topbar-title{font-size:14px;font-weight:700;letter-spacing:-.3px;flex:1}
+.nav-link{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text2);text-decoration:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 10px;transition:color .15s,border-color .15s}
+.nav-link:hover{color:var(--text);border-color:var(--border2)}
+.theme-btn{background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 10px;cursor:pointer;font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace;transition:border-color .15s,color .15s}
+.theme-btn:hover{border-color:var(--text);color:var(--text)}
+.main{padding:24px 20px;display:flex;flex-direction:column;gap:18px;flex:1}
+.lbl{font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--text2);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
+.section{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--surface)}
+.section-hdr{padding:9px 14px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between}
+.section-title{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text2)}
+.section-body{padding:16px}
+.drop-zone-multi{border:1.5px dashed var(--border2);border-radius:var(--r-lg);padding:28px 20px;text-align:center;cursor:pointer;position:relative;transition:border-color .15s,background .15s}
+.drop-zone-multi:hover,.drop-zone-multi.drag-over{border-color:var(--text);background:var(--surface2)}
+.drop-zone-multi input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:28px;margin-bottom:8px;display:block}
+.drop-label{font-size:13px;font-weight:600}
+.drop-hint{font-size:11px;color:var(--text2);margin-top:4px;font-family:'JetBrains Mono',monospace}
+.file-list{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.file-item{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:8px 12px}
+.file-icon{font-size:15px;flex-shrink:0}
+.file-name{font-family:'JetBrains Mono',monospace;font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-size{font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.remove-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0 2px;line-height:1;flex-shrink:0}
+.remove-btn:hover{color:var(--red-txt)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.toggle-row+.toggle-row{border-top:1px solid var(--border)}
+.toggle-lbl{font-size:13px;font-weight:500}
+.toggle-sub{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-left:6px}
+.toggle{position:relative;width:36px;height:20px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.slider{position:absolute;inset:0;background:var(--border2);border-radius:20px;cursor:pointer;transition:background .2s}
+.toggle input:checked+.slider{background:var(--text)}
+.slider::after{content:'';position:absolute;left:3px;top:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:left .2s}
+.toggle input:checked+.slider::after{left:19px}
+.grid-panel{margin-top:12px;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+.grid-panel-hdr{padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.grid-panel-hdr-lbl{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text2);font-weight:700;letter-spacing:.5px}
+.grid-panel-arrow{font-size:10px;color:var(--text3);transition:transform .2s}
+.grid-panel-arrow.open{transform:rotate(90deg)}
+.grid-panel-body{display:none;padding:12px;background:var(--surface)}
+.grid-panel-body.open{display:block}
+.grid-json{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;line-height:1.6}
+textarea.custom-grid{width:100%;min-height:160px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);resize:vertical;outline:none;margin-top:10px;line-height:1.6}
+textarea.custom-grid:focus{border-color:var(--text)}
+.run-btn{padding:13px 28px;background:var(--text);color:var(--bg);border:none;border-radius:var(--r-md);font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:opacity .15s;display:inline-flex;align-items:center;gap:8px}
+.run-btn:hover:not(:disabled){opacity:.82}
+.run-btn:disabled{opacity:.35;cursor:not-allowed}
+.progress-wrap{display:none}
+.progress-wrap.visible{display:block}
+.progress-lbl{font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.progress-msg{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.progress-pct{flex-shrink:0;font-weight:700;color:var(--text)}
+.progress-bar{height:4px;background:var(--border);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;background:var(--text);border-radius:99px;width:0%;transition:width .18s ease}
+.log-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);margin-top:12px}
+.log-hdr{padding:7px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.log-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--text2)}
+.log-clear{font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;font-family:'JetBrains Mono',monospace}
+.log-clear:hover{color:var(--text2)}
+.log-body{padding:10px 13px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);min-height:60px;max-height:160px;overflow-y:auto;line-height:1.7}
+.log-info{color:var(--blue-txt)}
+.log-ok{color:var(--green-txt)}
+.log-warn{color:var(--amber-txt)}
+.log-err{color:var(--red-txt)}
+.results-section{display:none}
+.results-section.visible{display:block}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--border);border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border)}
+.summary-card{background:var(--surface);padding:14px 16px}
+.summary-lbl{font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace;letter-spacing:.5px;margin-bottom:5px;display:block}
+.summary-val{font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.summary-val.green{color:var(--green-txt)}
+.summary-val.blue{color:var(--blue-txt)}
+.pill{font-size:10px;font-family:'JetBrains Mono',monospace;padding:3px 10px;border-radius:99px;font-weight:700;letter-spacing:.5px}
+.pill-ok{background:var(--green-bg);color:var(--green-txt)}
+.pill-err{background:var(--red-bg);color:var(--red-txt)}
+.download-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:var(--green-bg);color:var(--green-txt);border:1px solid currentColor;border-radius:var(--r-md);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;text-decoration:none;letter-spacing:.3px;transition:opacity .15s}
+.download-btn:hover{opacity:.8}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-lg)}
+table{width:100%;border-collapse:collapse;font-size:12px;font-family:'JetBrains Mono',monospace}
+thead{background:var(--surface2)}
+th{padding:9px 12px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text2);font-weight:700;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;position:relative}
+th:hover{color:var(--text)}
+th .sort-arrow{margin-left:4px;opacity:.4;font-size:9px}
+th.sort-asc .sort-arrow::after{content:'▲'}
+th.sort-desc .sort-arrow::after{content:'▼'}
+th:not(.sort-asc):not(.sort-desc) .sort-arrow::after{content:'⇅'}
+td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.td-err{color:var(--red-txt);font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.td-ok{color:var(--green-txt)}
+.td-warn{color:var(--amber-txt)}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+.badge-high{background:var(--red-bg);color:var(--red-txt)}
+.badge-medium{background:var(--amber-bg);color:var(--amber-txt)}
+.badge-low{background:var(--green-bg);color:var(--green-txt)}
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; position: relative; height: 320px; }
+.pb-input, .pb-select { width: 100%; font-size: 11px; font-family: 'JetBrains Mono', monospace; padding: 5px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); }
+.pb-input:focus, .pb-select:focus { border-color: var(--text); outline: none; }
+@media(max-width:700px){
+  .summary-grid{grid-template-columns:repeat(2,1fr)}
+  .topbar-title{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<header class="topbar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="9" y1="13" x2="15" y2="13"/>
+      <line x1="9" y1="17" x2="15" y2="17"/>
+    </svg>
+  </div>
+  <span class="topbar-title">PDF Compression Research — Batch Mode</span>
+  <a class="nav-link" href="/">&#8592; Single File</a>
+  <button class="theme-btn" id="themeBtn">dark</button>
+</header>
+
+<main class="main">
+
+  <!-- Upload -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="section-title">Input Files</span>
+      <span id="fileCountBadge" style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text3)">0 files</span>
+    </div>
+    <div class="section-body">
+      <div class="drop-zone-multi" id="dropZone">
+        <input type="file" id="fileInput" accept=".pdf" multiple>
+        <span class="drop-icon">📂</span>
+        <div class="drop-label">Drop PDFs here or click to select</div>
+        <div class="drop-hint">Multiple .pdf files · max 200 MB each</div>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+  </div>
+
+  <!-- Options -->
+  <div class="section">
+    <div class="section-hdr">
+      <span class="section-title">Options</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-row">
+        <span class="toggle-lbl">Evaluate quality (PSNR/SSIM) <span class="toggle-sub">renders pages for comparison</span></span>
+        <label class="toggle"><input type="checkbox" id="evalQuality" checked><span class="slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-lbl">Use adaptive parameter grid <span class="toggle-sub">grid disesuaikan per tipe dokumen (SCAN/DIGITAL/HYBRID)</span></span>
+        <label class="toggle"><input type="checkbox" id="useDefaultGrid" checked><span class="slider"></span></label>
+      </div>
+
+      <div id="customGridWrap" style="display:none">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; margin-bottom:8px">
+          <div class="lbl" style="margin:0">Manual Parameter Builder</div>
+          <button id="addParamBtn" class="theme-btn" style="padding:4px 10px">+ Add Row</button>
+        </div>
+        <div class="table-wrap" style="overflow-x:visible">
+          <table id="paramBuilderTable" style="margin-bottom:0">
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Level</th>
+                <th>PDF Setting</th>
+                <th style="width:80px">Color DPI</th>
+                <th style="width:80px">Gray DPI</th>
+                <th style="width:80px">Mono DPI</th>
+                <th style="width:70px">JPEG Q</th>
+                <th style="width:60px;text-align:center">Pikepdf</th>
+                <th style="width:30px"></th>
+              </tr>
+            </thead>
+            <tbody id="paramBuilderBody">
+              <!-- Rows added via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-panel" id="defaultGridPanel">
+        <div class="grid-panel-hdr" id="gridPanelToggle">
+          <span class="grid-panel-hdr-lbl">&#9654; Default Grid Preview</span>
+          <span class="grid-panel-arrow" id="gridArrow">&#9654;</span>
+        </div>
+        <div class="grid-panel-body" id="gridPanelBody">
+          <div class="grid-json" id="gridJson">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run -->
+  <div style="display:flex;align-items:center;gap:14px">
+    <button class="run-btn" id="runBtn" disabled>
+      <span id="runBtnText">Select files first</span>
+      <span style="font-size:15px">&#8594;</span>
+    </button>
+    <span id="runHint" style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace"></span>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="section">
+      <div class="section-hdr">
+        <span class="section-title">Progress</span>
+        <span class="pill" id="progressPill" style="background:var(--blue-bg);color:var(--blue-txt)">RUNNING</span>
+      </div>
+      <div class="section-body">
+        <div class="progress-lbl">
+          <span class="progress-msg" id="progressMsg">Initializing...</span>
+          <span class="progress-pct" id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="log-wrap">
+          <div class="log-hdr">
+            <span class="log-lbl">Log</span>
+            <button class="log-clear" id="logClear">clear</button>
+          </div>
+          <div class="log-body" id="logBody"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="resultsSection">
+    <div class="section">
+      <div class="section-hdr">
+        <span class="section-title">Summary</span>
+        <span class="pill pill-ok" id="resultPill">DONE</span>
+      </div>
+      <div class="section-body">
+        <div class="summary-grid" id="summaryGrid">
+          <div class="summary-card"><span class="summary-lbl">COMBINATIONS</span><span class="summary-val" id="sCombinations">—</span></div>
+          <div class="summary-card"><span class="summary-lbl">SUCCESSFUL</span><span class="summary-val green" id="sSuccessful">—</span></div>
+          <div class="summary-card"><span class="summary-lbl">AVG SAVING</span><span class="summary-val green" id="sSavingAvg">—</span></div>
+          <div class="summary-card"><span class="summary-lbl">MAX SAVING</span><span class="summary-val green" id="sSavingMax">—</span></div>
+          <div class="summary-card"><span class="summary-lbl">MIN SAVING</span><span class="summary-val" id="sSavingMin">—</span></div>
+          <div class="summary-card"><span class="summary-lbl">AVG SSIM</span><span class="summary-val blue" id="sSsimAvg">—</span></div>
+          <div class="summary-card"><span class="summary-lbl">AVG PSNR</span><span class="summary-val blue" id="sPsnrAvg">—</span></div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+          <a class="download-btn" id="downloadBtn" href="#" style="display:none">&#11015; Download CSV</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:20px">
+      <div class="section-hdr">
+        <span class="section-title">Sweet Spot: LOW Compression (High Quality)</span>
+      </div>
+      <div class="section-body">
+        <div class="chart-grid">
+          <div class="chart-card"><canvas id="ssimChartLOW"></canvas></div>
+          <div class="chart-card"><canvas id="psnrChartLOW"></canvas></div>
+          <div class="chart-card"><canvas id="tpChartLOW"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:20px">
+      <div class="section-hdr">
+        <span class="section-title">Sweet Spot: MEDIUM Compression</span>
+      </div>
+      <div class="section-body">
+        <div class="chart-grid">
+          <div class="chart-card"><canvas id="ssimChartMEDIUM"></canvas></div>
+          <div class="chart-card"><canvas id="psnrChartMEDIUM"></canvas></div>
+          <div class="chart-card"><canvas id="tpChartMEDIUM"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:20px">
+      <div class="section-hdr">
+        <span class="section-title">Sweet Spot: HIGH Compression (Low Quality)</span>
+      </div>
+      <div class="section-body">
+        <div class="chart-grid">
+          <div class="chart-card"><canvas id="ssimChartHIGH"></canvas></div>
+          <div class="chart-card"><canvas id="psnrChartHIGH"></canvas></div>
+          <div class="chart-card"><canvas id="tpChartHIGH"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:20px">
+      <div class="section-hdr">
+        <span class="section-title">Results Table</span>
+        <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text3)" id="rowCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="resultsTable">
+          <thead>
+            <tr>
+              <th data-col="filename">Filename<span class="sort-arrow"></span></th>
+              <th data-col="param_label">Param Label<span class="sort-arrow"></span></th>
+              <th data-col="level">Level<span class="sort-arrow"></span></th>
+              <th data-col="color_dpi">Color DPI<span class="sort-arrow"></span></th>
+              <th data-col="jpeg_quality_used">JPEG Q<span class="sort-arrow"></span></th>
+              <th data-col="saving_pct">Saving %<span class="sort-arrow"></span></th>
+              <th data-col="ratio">Ratio<span class="sort-arrow"></span></th>
+              <th data-col="psnr_avg">PSNR avg<span class="sort-arrow"></span></th>
+              <th data-col="ssim_avg">SSIM avg<span class="sort-arrow"></span></th>
+              <th data-col="text_preserved_pct">Text %<span class="sort-arrow"></span></th>
+              <th data-col="text_sequence_ratio">Seq Ratio<span class="sort-arrow"></span></th>
+              <th data-col="time_ms">Time ms<span class="sort-arrow"></span></th>
+              <th data-col="error">Error<span class="sort-arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+<script>
+// ── Theme ──────────────────────────────────────────────────────────────────
+const saved = localStorage.getItem('theme') || 'light';
+if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+document.getElementById('themeBtn').textContent = saved === 'dark' ? 'light' : 'dark';
+document.getElementById('themeBtn').onclick = () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = isDark ? 'dark' : 'light';
+  localStorage.setItem('theme', isDark ? 'light' : 'dark');
+  // Re-render charts when theme changes if data is present
+  if (tableData && tableData.length) {
+    renderCharts(tableData);
+  }
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+let uploadedFiles = [];
+let tableData = [];
+let sortCol = null;
+let sortDir = 'asc';
+let currentToken = null;
+
+let chartInstances = [];
+
+const $ = id => document.getElementById(id);
+
+// ── Default grid fetch ─────────────────────────────────────────────────────
+fetch('/batch/default_grid')
+  .then(r => r.json())
+  .then(data => {
+    const lines = [
+      `Adaptive grid per doc type:`,
+      `  SCAN    → ${data.SCAN?.count ?? '?'} combinations (DPI sweep + JPEG quality)`,
+      `  DIGITAL → ${data.DIGITAL?.count ?? '?'} combinations (pdf_setting + pikepdf on/off)`,
+      `  HYBRID  → ${data.HYBRID?.count ?? '?'} combinations (preset + DPI + JPEG quality)`,
+      ``,
+      `DIGITAL grid sample:`,
+      JSON.stringify(data.DIGITAL?.grid?.slice(0,3) ?? [], null, 2),
+    ];
+    $('gridJson').textContent = lines.join('\n');
+  })
+  .catch(() => { $('gridJson').textContent = 'Failed to load grid.'; });
+
+// ── Grid panel toggle ──────────────────────────────────────────────────────
+$('gridPanelToggle').addEventListener('click', () => {
+  const body = $('gridPanelBody');
+  const arrow = $('gridArrow');
+  const open = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+  $('gridPanelToggle').querySelector('.grid-panel-hdr-lbl').textContent =
+    (open ? '\u25BC' : '\u25BA') + ' Default Grid Preview';
+});
+
+// ── Custom grid toggle ─────────────────────────────────────────────────────
+const useDefaultGridCb = $('useDefaultGrid');
+const savedToggle = localStorage.getItem('useDefaultGrid');
+if (savedToggle !== null) {
+  useDefaultGridCb.checked = savedToggle === 'true';
+}
+$('customGridWrap').style.display = useDefaultGridCb.checked ? 'none' : 'block';
+$('defaultGridPanel').style.display = useDefaultGridCb.checked ? 'block' : 'none';
+
+useDefaultGridCb.addEventListener('change', function() {
+  $('customGridWrap').style.display = this.checked ? 'none' : 'block';
+  $('defaultGridPanel').style.display = this.checked ? 'block' : 'none';
+  localStorage.setItem('useDefaultGrid', this.checked);
+});
+
+// ── Parameter Builder Logic ────────────────────────────────────────────────
+const pbBody = $('paramBuilderBody');
+let pbRowCount = 0;
+
+function getParamGrid() {
+  const rows = pbBody.querySelectorAll('tr');
+  const grid = [];
+  rows.forEach(tr => {
+    const getVal = key => tr.querySelector(`[data-key="${key}"]`).value;
+    const getNum = key => { const v = getVal(key); return v ? parseInt(v) : null; };
+    const getSetting = key => { const v = getVal(key); return v === "" ? null : v; };
+    
+    grid.push({
+      label: getVal('label'),
+      level: getVal('level'),
+      pdf_setting: getSetting('pdf_setting'),
+      color_dpi: getNum('color_dpi'),
+      gray_dpi: getNum('gray_dpi'),
+      mono_dpi: getNum('mono_dpi'),
+      jpeg_quality: getNum('jpeg_quality'),
+      pikepdf_optimize: tr.querySelector('[data-key="pikepdf_optimize"]').checked,
+      grayscale: false
+    });
+  });
+  return JSON.stringify(grid);
+}
+
+function saveParamGrid() {
+  localStorage.setItem('paramGrid', getParamGrid());
+}
+
+pbBody.addEventListener('change', saveParamGrid);
+pbBody.addEventListener('input', saveParamGrid);
+
+function addParamRow(initial = null) {
+  const tr = document.createElement('tr');
+  const label = initial ? initial.label : `custom_${pbRowCount}`;
+  const level = initial ? initial.level : 'MEDIUM';
+  const pdf_setting = initial ? initial.pdf_setting || '' : '';
+  const color_dpi = initial && initial.color_dpi ? initial.color_dpi : '';
+  const gray_dpi = initial && initial.gray_dpi ? initial.gray_dpi : '';
+  const mono_dpi = initial && initial.mono_dpi ? initial.mono_dpi : '';
+  const jpeg_quality = initial && initial.jpeg_quality ? initial.jpeg_quality : '';
+  const pikepdf_optimize = initial ? initial.pikepdf_optimize : true;
+
+  tr.innerHTML = `
+    <td><input type="text" class="pb-input" value="${label}" data-key="label"></td>
+    <td>
+      <select class="pb-select" data-key="level">
+        <option value="LOW" ${level === 'LOW' ? 'selected' : ''}>LOW</option>
+        <option value="MEDIUM" ${level === 'MEDIUM' ? 'selected' : ''}>MEDIUM</option>
+        <option value="HIGH" ${level === 'HIGH' ? 'selected' : ''}>HIGH</option>
+      </select>
+    </td>
+    <td>
+      <select class="pb-select" data-key="pdf_setting">
+        <option value="" ${pdf_setting === '' ? 'selected' : ''}>auto</option>
+        <option value="/screen" ${pdf_setting === '/screen' ? 'selected' : ''}>/screen</option>
+        <option value="/ebook" ${pdf_setting === '/ebook' ? 'selected' : ''}>/ebook</option>
+        <option value="/printer" ${pdf_setting === '/printer' ? 'selected' : ''}>/printer</option>
+        <option value="/prepress" ${pdf_setting === '/prepress' ? 'selected' : ''}>/prepress</option>
+        <option value="/default" ${pdf_setting === '/default' ? 'selected' : ''}>/default</option>
+      </select>
+    </td>
+    <td><input type="number" class="pb-input" placeholder="auto" value="${color_dpi}" data-key="color_dpi"></td>
+    <td><input type="number" class="pb-input" placeholder="auto" value="${gray_dpi}" data-key="gray_dpi"></td>
+    <td><input type="number" class="pb-input" placeholder="auto" value="${mono_dpi}" data-key="mono_dpi"></td>
+    <td><input type="number" class="pb-input" placeholder="auto" value="${jpeg_quality}" data-key="jpeg_quality"></td>
+    <td style="text-align:center"><input type="checkbox" ${pikepdf_optimize ? 'checked' : ''} data-key="pikepdf_optimize"></td>
+    <td><button class="remove-btn" onclick="this.closest('tr').remove(); saveParamGrid()">&#10005;</button></td>
+  `;
+  pbBody.appendChild(tr);
+  pbRowCount++;
+  saveParamGrid();
+}
+
+$('addParamBtn').addEventListener('click', () => addParamRow());
+
+function initParamGrid() {
+  const saved = localStorage.getItem('paramGrid');
+  if (saved) {
+    try {
+      const grid = JSON.parse(saved);
+      if (grid && grid.length > 0) {
+        grid.forEach(row => addParamRow(row));
+        return;
+      }
+    } catch(e) {}
+  }
+  addParamRow(); // fallback
+}
+initParamGrid();
+
+// ── File handling ──────────────────────────────────────────────────────────
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(2) + ' MB';
+}
+
+function renderFileList() {
+  const list = $('fileList');
+  list.innerHTML = '';
+  uploadedFiles.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `
+      <span class="file-icon">&#128196;</span>
+      <span class="file-name">${f.name}</span>
+      <span class="file-size">${formatBytes(f.size)}</span>
+      <button class="remove-btn" data-idx="${i}" title="Remove">&#10005;</button>
+    `;
+    list.appendChild(item);
+  });
+  list.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      uploadedFiles.splice(parseInt(e.currentTarget.dataset.idx), 1);
+      renderFileList();
+      updateRunBtn();
+    });
+  });
+  $('fileCountBadge').textContent = uploadedFiles.length + ' file' + (uploadedFiles.length !== 1 ? 's' : '');
+}
+
+function addFiles(newFiles) {
+  for (const f of newFiles) {
+    if (f.name.toLowerCase().endsWith('.pdf') && !uploadedFiles.find(x => x.name === f.name && x.size === f.size)) {
+      uploadedFiles.push(f);
+    }
+  }
+  renderFileList();
+  updateRunBtn();
+}
+
+const dz = $('dropZone');
+const fi = $('fileInput');
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  addFiles(e.dataTransfer.files);
+});
+fi.addEventListener('change', () => { addFiles(fi.files); fi.value = ''; });
+
+// ── Run button state ───────────────────────────────────────────────────────
+function updateRunBtn() {
+  const btn = $('runBtn');
+  const hint = $('runHint');
+  if (uploadedFiles.length === 0) {
+    btn.disabled = true;
+    $('runBtnText').textContent = 'Select files first';
+    hint.textContent = '';
+  } else {
+    btn.disabled = false;
+    const useDefault = $('useDefaultGrid').checked;
+    const combos = useDefault ? `~8-12 per file (adaptive)` : 'custom';
+    $('runBtnText').textContent = 'Run Batch Analysis';
+    hint.textContent = `${uploadedFiles.length} file(s) × ${combos} params`;
+  }
+}
+
+$('useDefaultGrid').addEventListener('change', updateRunBtn);
+
+// ── Log helpers ────────────────────────────────────────────────────────────
+function log(msg, cls) {
+  const body = $('logBody');
+  const line = document.createElement('div');
+  line.className = cls || '';
+  line.textContent = msg;
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+}
+
+$('logClear').addEventListener('click', () => { $('logBody').innerHTML = ''; });
+
+// ── Run batch ──────────────────────────────────────────────────────────────
+$('runBtn').addEventListener('click', runBatch);
+
+function runBatch() {
+  if (uploadedFiles.length === 0) return;
+
+  // Reset UI
+  $('progressWrap').classList.add('visible');
+  $('resultsSection').classList.remove('visible');
+  $('logBody').innerHTML = '';
+  $('progressFill').style.width = '0%';
+  $('progressMsg').textContent = 'Starting...';
+  $('progressPct').textContent = '0%';
+  $('progressPill').textContent = 'RUNNING';
+  $('progressPill').style.background = 'var(--blue-bg)';
+  $('progressPill').style.color = 'var(--blue-txt)';
+  $('runBtn').disabled = true;
+  $('downloadBtn').style.display = 'none';
+  currentToken = null;
+
+  const fd = new FormData();
+  uploadedFiles.forEach(f => fd.append('pdfs', f));
+  fd.append('evaluate_quality', $('evalQuality').checked ? 'true' : 'false');
+
+  if (!$('useDefaultGrid').checked) {
+    const customVal = getParamGrid();
+    if (customVal && customVal !== "[]") fd.append('param_grid', customVal);
+  }
+
+  log('Uploading files and starting batch...', 'log-info');
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/batch/run', true);
+
+  let buffer = '';
+
+  xhr.onprogress = () => {
+    const newText = xhr.responseText.slice(buffer.length);
+    buffer = xhr.responseText;
+    const lines = newText.split('\n');
+    let event = null;
+    let dataStr = null;
+    for (const line of lines) {
+      if (line.startsWith('event: ')) event = line.slice(7).trim();
+      else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
+      else if (line === '' && event && dataStr) {
+        handleSSE(event, dataStr);
+        event = null;
+        dataStr = null;
+      }
+    }
+  };
+
+  xhr.onload = () => {
+    if (xhr.status !== 200) {
+      log('Server error: ' + xhr.status, 'log-err');
+      $('runBtn').disabled = false;
+    }
+  };
+
+  xhr.onerror = () => {
+    log('Network error.', 'log-err');
+    $('runBtn').disabled = false;
+  };
+
+  xhr.send(fd);
+}
+
+function handleSSE(event, dataStr) {
+  let data;
+  try { data = JSON.parse(dataStr); } catch { return; }
+
+  if (event === 'progress') {
+    const pct = data.pct || 0;
+    $('progressFill').style.width = pct + '%';
+    $('progressPct').textContent = pct + '%';
+    $('progressMsg').textContent = data.detail || data.step || '';
+    log('[' + pct + '%] ' + (data.detail || data.step || ''), 'log-info');
+  } else if (event === 'done') {
+    $('progressFill').style.width = '100%';
+    $('progressPct').textContent = '100%';
+    $('progressMsg').textContent = 'Done!';
+    $('progressPill').textContent = 'DONE';
+    $('progressPill').style.background = 'var(--green-bg)';
+    $('progressPill').style.color = 'var(--green-txt)';
+    log('Batch complete — ' + data.count + ' results.', 'log-ok');
+    currentToken = data.token;
+    // Make sure section is visible before charts render to get correct dimensions
+    showResults(data.summary, data.token);
+    // Populate table directly from rows in SSE payload (no extra fetch needed)
+    if (data.rows && data.rows.length) {
+      tableData = data.rows;
+      sortCol = null;
+      renderTable();
+      renderCharts(data.rows);
+    }
+    $('runBtn').disabled = false;
+  } else if (event === 'error') {
+    $('progressPill').textContent = 'ERROR';
+    $('progressPill').style.background = 'var(--red-bg)';
+    $('progressPill').style.color = 'var(--red-txt)';
+    log('Error: ' + (data.message || 'unknown'), 'log-err');
+    $('runBtn').disabled = false;
+  }
+}
+
+// ── Results display ────────────────────────────────────────────────────────
+function showResults(summary, token) {
+  $('resultsSection').classList.add('visible');
+
+  if (summary && Object.keys(summary).length) {
+    $('sCombinations').textContent = summary.total_combinations ?? '—';
+    $('sSuccessful').textContent   = summary.successful ?? '—';
+    $('sSavingAvg').textContent    = summary.saving_avg != null ? summary.saving_avg + '%' : '—';
+    $('sSavingMax').textContent    = summary.saving_max != null ? summary.saving_max + '%' : '—';
+    $('sSavingMin').textContent    = summary.saving_min != null ? summary.saving_min + '%' : '—';
+    $('sSsimAvg').textContent      = summary.ssim_avg != null ? summary.ssim_avg : '—';
+    $('sPsnrAvg').textContent      = summary.psnr_avg != null ? summary.psnr_avg + ' dB' : '—';
+  }
+
+  if (token) {
+    const dlBtn = $('downloadBtn');
+    dlBtn.href = '/batch/csv/' + token;
+    dlBtn.style.display = 'inline-flex';
+  }
+}
+
+// ── Table uses tableData populated directly from SSE rows ──────────────────
+// Download button is a plain href — token stays valid for 10 min (no pop)
+
+function renderCharts(rows) {
+  const validRows = rows.filter(r => r.saving_pct != null && !r.error);
+  if (!validRows.length) return;
+  
+  chartInstances.forEach(c => c.destroy());
+  chartInstances = [];
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#9a9890' : '#6b6960';
+  const gridColor = isDark ? '#333230' : '#d8d6cc';
+
+  Chart.defaults.color = textColor;
+  Chart.defaults.font.family = "'JetBrains Mono', monospace";
+
+  const getPointColor = (level) => {
+    if (level === 'HIGH') return 'rgba(239, 68, 68, 0.8)'; // red
+    if (level === 'MEDIUM') return 'rgba(245, 158, 11, 0.8)'; // amber
+    if (level === 'LOW') return 'rgba(34, 197, 94, 0.8)'; // green
+    return 'rgba(59, 130, 246, 0.8)'; // blue default
+  };
+
+  const createScatterConfig = (dataPoints, xLabel, yLabel, title, levelColor, annotationLines = [], annotationBoxes = []) => {
+    let annotationPlugin = { annotations: {} };
+    let annCount = 0;
+    
+    if (annotationBoxes && annotationBoxes.length > 0) {
+      annotationBoxes.forEach((box) => {
+        annotationPlugin.annotations['box' + annCount] = {
+          type: 'box',
+          yMin: box.yMin,
+          yMax: box.yMax,
+          backgroundColor: box.bgColor || 'rgba(0, 0, 0, 0.05)',
+          borderWidth: 0,
+          label: {
+            content: box.label,
+            display: !!box.label,
+            position: box.labelPos || 'center',
+            color: box.labelColor || '#888',
+            font: { family: "'Inter', sans-serif", size: 10, weight: 'bold' }
+          }
+        };
+        annCount++;
+      });
+    }
+
+    if (annotationLines && annotationLines.length > 0) {
+      annotationLines.forEach((line) => {
+        annotationPlugin.annotations['line' + annCount] = {
+          type: 'line',
+          yMin: line.y,
+          yMax: line.y,
+          borderColor: line.color || 'rgba(239, 68, 68, 0.8)',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          label: {
+            content: line.label,
+            display: true,
+            position: 'start',
+            backgroundColor: line.color || 'rgba(239, 68, 68, 0.9)',
+            color: '#fff',
+            font: { family: "'Inter', sans-serif", size: 9 },
+            padding: 4
+          }
+        };
+        annCount++;
+      });
+    }
+
+    return {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: title,
+          data: dataPoints,
+          backgroundColor: levelColor,
+          pointRadius: 6,
+          pointHoverRadius: 9
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          annotation: (annotationLines.length > 0 || annotationBoxes.length > 0) ? annotationPlugin : undefined,
+          title: { display: true, text: title, color: textColor, font: { size: 13, family: "'Inter', sans-serif" } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const r = ctx.raw.raw;
+                return [
+                  `📄 Dokumen: ${r.filename}`,
+                  `⚙️ Skenario Uji: ${r.param_label}`,
+                  `📉 Ukuran Menyusut: ${r.saving_pct}% lebih kecil`,
+                  `🎯 Nilai ${yLabel.split(' ')[0]}: ${ctx.raw.y.toFixed(3)}`,
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { 
+            title: { display: true, text: xLabel },
+            grid: { color: gridColor },
+          },
+          y: { 
+            title: { display: true, text: yLabel },
+            grid: { color: gridColor },
+          }
+        }
+      }
+    };
+  };
+
+  ['LOW', 'MEDIUM', 'HIGH'].forEach(level => {
+    const levelRows = validRows.filter(r => r.level === level);
+    // Even if empty, we re-render or let it be empty so previous data doesn't persist
+    const ssimData = levelRows.map(r => ({ x: r.saving_pct, y: r.ssim_avg || 0, raw: r }));
+    const psnrData = levelRows.map(r => ({ x: r.saving_pct, y: r.psnr_avg || 0, raw: r }));
+    const tpData = levelRows.map(r => {
+      let tp = 0;
+      if (r.time_ms > 0 && r.original_size_mb) {
+        tp = r.original_size_mb / (r.time_ms / 1000);
+      }
+      return { x: r.saving_pct, y: tp, raw: r };
+    });
+
+    const color = getPointColor(level);
+
+    const ctxSsim = $(`ssimChart${level}`);
+    const ctxPsnr = $(`psnrChart${level}`);
+    const ctxTp = $(`tpChart${level}`);
+    
+    let ssimLines = [];
+    let psnrLines = [];
+    let tpLines = [];
+    
+    let ssimBoxes = [];
+    let psnrBoxes = [];
+    let tpBoxes = [];
+
+    // Conversational Axis Labels
+    const xLab = 'Penghematan Ruang (%)';
+    const ssimLab = 'Kualitas Bentuk (0=Hancur, 1=Sempurna)';
+    const psnrLab = 'Kejernihan Visual (Semakin tinggi semakin baik)';
+    const tpLab = 'Kecepatan Proses (MB/Detik)';
+
+    if (level === 'LOW') { // High Quality
+      ssimLines = [{ y: 0.95, color: 'rgba(34, 197, 94, 0.8)', label: 'Aman untuk Cetak (\u22650.95)' }];
+      psnrLines = [{ y: 35, color: 'rgba(34, 197, 94, 0.8)', label: 'Sangat Jernih (\u226535)' }];
+      tpLines = [{ y: 0.10, color: 'rgba(239, 68, 68, 0.8)', label: 'Proses Lambat/Berat (\u22640.10)' }];
+      
+      ssimBoxes = [{ yMin: 0.95, yMax: 1.0, bgColor: 'rgba(34, 197, 94, 0.1)', label: 'KUALITAS TINGGI' }];
+      psnrBoxes = [{ yMin: 35, yMax: 100, bgColor: 'rgba(34, 197, 94, 0.1)', label: 'SANGAT JERNIH' }];
+    } else if (level === 'MEDIUM') { // Sweet Spot
+      ssimLines = [
+        { y: 0.90, color: 'rgba(245, 158, 11, 0.8)', label: 'Batas Bawah (0.90)' },
+        { y: 0.95, color: 'rgba(34, 197, 94, 0.8)', label: 'Batas Atas (0.95)' }
+      ];
+      psnrLines = [
+        { y: 30, color: 'rgba(245, 158, 11, 0.8)', label: 'Mulai Blur (30)' },
+        { y: 35, color: 'rgba(34, 197, 94, 0.8)', label: 'Sangat Jernih (35)' }
+      ];
+      tpLines = [
+        { y: 0.10, color: 'rgba(245, 158, 11, 0.8)', label: 'Min (0.10)' },
+        { y: 0.25, color: 'rgba(34, 197, 94, 0.8)', label: 'Max (0.25)' }
+      ];
+      
+      ssimBoxes = [{ yMin: 0.90, yMax: 0.95, bgColor: 'rgba(245, 158, 11, 0.1)', label: 'ZONA SWEET SPOT' }];
+      psnrBoxes = [{ yMin: 30, yMax: 35, bgColor: 'rgba(245, 158, 11, 0.1)', label: 'ZONA SWEET SPOT' }];
+      tpBoxes = [{ yMin: 0.10, yMax: 0.25, bgColor: 'rgba(245, 158, 11, 0.1)', label: 'ZONA KECEPATAN IDEAL' }];
+    } else if (level === 'HIGH') { // Extreme / Low Quality
+      ssimLines = [{ y: 0.90, color: 'rgba(239, 68, 68, 0.8)', label: 'Kualitas Buruk (\u22640.90)' }];
+      psnrLines = [{ y: 30, color: 'rgba(239, 68, 68, 0.8)', label: 'Banyak Noise (\u226430)' }];
+      tpLines = [{ y: 0.25, color: 'rgba(34, 197, 94, 0.8)', label: 'Proses Sangat Cepat (\u22650.25)' }];
+      
+      ssimBoxes = [{ yMin: 0, yMax: 0.90, bgColor: 'rgba(239, 68, 68, 0.1)', label: 'KUALITAS BURUK / PECAH' }];
+      psnrBoxes = [{ yMin: 0, yMax: 30, bgColor: 'rgba(239, 68, 68, 0.1)', label: 'BANYAK NOISE' }];
+    }
+
+    if (ctxSsim) chartInstances.push(new Chart(ctxSsim.getContext('2d'), createScatterConfig(ssimData, xLab, ssimLab, `Grafik 1: Kestabilan Bentuk (${level})`, color, ssimLines, ssimBoxes)));
+    if (ctxPsnr) chartInstances.push(new Chart(ctxPsnr.getContext('2d'), createScatterConfig(psnrData, xLab, psnrLab, `Grafik 2: Kejernihan Visual (${level})`, color, psnrLines, psnrBoxes)));
+    if (ctxTp) chartInstances.push(new Chart(ctxTp.getContext('2d'), createScatterConfig(tpData, xLab, tpLab, `Grafik 3: Kecepatan Eksekusi (${level})`, color, tpLines, tpBoxes)));
+  });
+}
+
+function renderTable() {
+  const cols = ['filename','param_label','level','color_dpi','jpeg_quality_used','saving_pct','ratio','psnr_avg','ssim_avg','text_preserved_pct','text_sequence_ratio','time_ms','error'];
+  const tbody = $('resultsBody');
+  tbody.innerHTML = '';
+
+  let data = [...tableData];
+  if (sortCol) {
+    data.sort((a, b) => {
+      let av = a[sortCol], bv = b[sortCol];
+      const an = parseFloat(av), bn = parseFloat(bv);
+      if (!isNaN(an) && !isNaN(bn)) { av = an; bv = bn; }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  $('rowCount').textContent = data.length + ' rows';
+
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    cols.forEach(col => {
+      const td = document.createElement('td');
+      const val = row[col];
+      if (col === 'level') {
+        const cls = val === 'HIGH' ? 'badge-high' : val === 'MEDIUM' ? 'badge-medium' : 'badge-low';
+        td.innerHTML = `<span class="badge ${cls}">${val || '—'}</span>`;
+      } else if (col === 'saving_pct') {
+        const n = parseFloat(val);
+        td.textContent = isNaN(n) ? '—' : n.toFixed(2) + '%';
+        if (!isNaN(n) && n > 0) td.className = 'td-ok';
+      } else if (col === 'psnr_avg' || col === 'ssim_avg') {
+        const n = parseFloat(val);
+        td.textContent = isNaN(n) ? '—' : n;
+        if (!isNaN(n)) td.style.color = 'var(--blue-txt)';
+      } else if (col === 'text_preserved_pct') {
+        const n = parseFloat(val);
+        td.textContent = isNaN(n) ? '—' : n.toFixed(1) + '%';
+      } else if (col === 'error') {
+        const errStr = val != null ? String(val) : '';
+        if (errStr) {
+          td.className = 'td-err';
+          td.title = errStr;
+          td.textContent = errStr.length > 40 ? errStr.slice(0, 40) + '...' : errStr;
+        } else {
+          td.textContent = '';
+        }
+      } else {
+        td.textContent = (val != null && val !== '') ? val : '—';
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Table sort ─────────────────────────────────────────────────────────────
+document.querySelectorAll('#resultsTable th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortCol = col;
+      sortDir = 'asc';
+    }
+    document.querySelectorAll('#resultsTable th').forEach(h => {
+      h.classList.remove('sort-asc', 'sort-desc');
+    });
+    th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    renderTable();
+  });
+});
+</script>
+</body>
+</html>
