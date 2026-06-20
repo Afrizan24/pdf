@@ -1,4 +1,4 @@
-﻿"""
+"""
 PDF compression — two-pass pipeline: Ghostscript then pikepdf structural optimize.
 
 Classification (SCAN / DIGITAL / HYBRID) determines the default GS preset.

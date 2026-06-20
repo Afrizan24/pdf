@@ -872,6 +872,10 @@
                     <div class="res-lbl">WAKTU PROSES</div>
                     <div class="res-val" style="font-size:14px;" id="tm4">-</div>
                   </div>
+                  <div class="res-stat">
+                    <div class="res-lbl">PENGARUH GS</div>
+                    <div class="res-val" id="inf4" style="color:#e06c2b;font-size:14px;font-weight:bold;">-</div>
+                  </div>
                   <div
                     style="background:var(--surface2);padding:12px;border-radius:6px;font-family:monospace;font-size:11px;color:var(--text2);word-break:break-all;line-height:1.5;">
                     <span style="color:var(--text);font-weight:bold;">EXECUTED:</span> <span id="gsCmdText">Menunggu
@@ -966,8 +970,8 @@
                     <div class="res-val" id="sz5" style="color:var(--green);font-size:24px;">-</div>
                   </div>
                   <div class="res-stat">
-                    <div class="res-lbl">PENGHEMATAN</div>
-                    <div class="res-val" id="sav5" style="color:var(--green);">-</div>
+                    <div class="res-lbl">PENGARUH PIKEPDF</div>
+                    <div class="res-val" id="sav5" style="color:var(--green);font-size:14px;font-weight:bold;">-</div>
                   </div>
                   <div class="res-stat">
                     <div class="res-lbl">WAKTU PROSES</div>
@@ -979,41 +983,6 @@
                     <div id="pikeStep2" style="opacity:0.3;">⏳ Garbage Collection...</div>
                   </div>
                 </div>
-              </div>
-              <div class="comp-wrapper">
-                <div
-                  style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:bold;">
-                  KOMPARASI & DAMPAK PER PROSES</div>
-
-                <div class="comp-row">
-                  <div class="comp-label">1. ORIGINAL</div>
-                  <div class="comp-track">
-                    <div class="comp-fill" id="barOrig" style="background:var(--text);"></div>
-                  </div>
-                  <div class="comp-val" id="valOrig">-</div>
-                </div>
-
-                <div class="comp-row">
-                  <div class="comp-label">2. GHOSTSCRIPT</div>
-                  <div class="comp-track">
-                    <div class="comp-fill" id="barGs" style="background:#e06c2b;"></div>
-                  </div>
-                  <div class="comp-val" id="valGs">-</div>
-                </div>
-                <div class="comp-delta" style="text-align:right; margin-top:-8px; margin-bottom:8px; color:#e06c2b;"
-                  id="deltaGs">Dampak Visual: -</div>
-
-                <div class="comp-row">
-                  <div class="comp-label">3. PIKEPDF</div>
-                  <div class="comp-track">
-                    <div class="comp-fill" id="barPike" style="background:var(--green);"></div>
-                  </div>
-                  <div class="comp-val" id="valPike">-</div>
-                </div>
-                <div class="comp-delta"
-                  style="text-align:right; margin-top:-8px; margin-bottom:8px; color:var(--green);" id="deltaPike">
-                  Dampak Struktural: -</div>
-
               </div>
               <div id="anat5" style="width:100%; margin-top:16px;"></div>
             </div>
@@ -1499,6 +1468,10 @@
           gsSize = d.size_bytes;
           document.getElementById('sz4').textContent = d.size_formatted;
           document.getElementById('tm4').textContent = d.time_ms + ' ms';
+          
+          const gsSaving = origSize > 0 ? ((1 - (gsSize / origSize)) * 100).toFixed(1) : 0;
+          document.getElementById('inf4').textContent = gsSaving > 0 ? gsSaving + '%' : '0%';
+          
           document.getElementById('gsCmdText').textContent = d.params_used;
           if (d.thumbnail) document.getElementById('thumb4').src = d.thumbnail;
 
@@ -1571,7 +1544,7 @@
           document.getElementById('src5').textContent = d.source_used;
           if (d.thumbnail) document.getElementById('thumb5').src = d.thumbnail;
 
-          const sav = ((1 - (d.size_bytes / origSize)) * 100).toFixed(1);
+          const sav = gsSize > 0 ? ((1 - (d.size_bytes / gsSize)) * 100).toFixed(1) : 0;
           document.getElementById('sav5').textContent = sav > 0 ? sav + '%' : '0%';
 
           pikeSize = d.size_bytes;
@@ -1582,31 +1555,6 @@
           setTimeout(() => { document.getElementById('pikeStep1').innerHTML = '✅ ObjStm Packing...'; }, 300);
           setTimeout(() => { document.getElementById('pikeStep2').style.opacity = '1'; }, 600);
           setTimeout(() => { document.getElementById('pikeStep2').innerHTML = '✅ Garbage Collection...'; }, 900);
-
-          // Update Horizontal Size Bars
-          setTimeout(() => {
-            const pOrig = 100;
-            const pGs = Math.min(100, (gsSize / origSize) * 100);
-            const pPike = Math.min(100, (d.size_bytes / origSize) * 100);
-
-            document.getElementById('barOrig').style.width = pOrig + '%';
-            document.getElementById('barGs').style.width = pGs + '%';
-            document.getElementById('barPike').style.width = pPike + '%';
-
-            document.getElementById('valOrig').textContent = (origSize / 1048576).toFixed(2) + ' MB';
-            document.getElementById('valGs').textContent = (gsSize / 1048576).toFixed(2) + ' MB';
-            document.getElementById('valPike').textContent = (d.size_bytes / 1048576).toFixed(2) + ' MB';
-
-            const deltaGsMB = Math.max(0, (origSize - gsSize) / 1048576).toFixed(2);
-            const deltaGsPct = Math.max(0, ((origSize - gsSize) / origSize) * 100).toFixed(1);
-            document.getElementById('deltaGs').textContent = `Dampak Visual: Menghemat ${deltaGsMB} MB (${deltaGsPct}%)`;
-
-            const deltaPikeMB = Math.max(0, (gsSize - d.size_bytes) / 1048576).toFixed(2);
-            let deltaPikePct = 0;
-            if (origSize > 0) deltaPikePct = Math.max(0, ((gsSize - d.size_bytes) / origSize) * 100).toFixed(1);
-            document.getElementById('deltaPike').textContent = `Dampak Struktural: Menghemat ${deltaPikeMB} MB (${deltaPikePct}%)`;
-
-          }, 100);
 
         }).catch(e => {
           loadingBtn(5, false);
